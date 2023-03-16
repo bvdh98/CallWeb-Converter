@@ -1,0 +1,12 @@
+*.csv
+*.docx
+*.scw
+*.xlsx
+*R
+*html
+table_groups.txt
+test.ipynb
+docx_xml_processing.py
+Parser.py
+.vscode
+__pycache__
