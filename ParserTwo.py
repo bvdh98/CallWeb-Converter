@@ -140,7 +140,6 @@ class Parser:
             # update header in list
             headers[indx] = header
     # for each table question add a reference to it in the content
-
     def add_tbl_qs_ref_to_content(self):
         # iterate over each table question and key in dictionary
         for k, q in self.tbl_qs.items():
@@ -199,7 +198,7 @@ class Parser:
                 # get table questions
                 tbl_q = self.tbl_qs[tbl_id]
                 # add table question to current questions list of tbl qs
-                self.update_question(self.cur_q, 'tbl_q', tbl_q)
+                self.cur_q.tbl_qs = tbl_q
                 # update current question codes with table q codes
                 self.cur_q.update_codes_from_tbl_q(tbl_q.codes)
                 # skip to the next row since we just updated the codes
@@ -210,30 +209,8 @@ class Parser:
                 # remove code flag from row text
                 r_text = self.remove_code_flag(r_text)
                 # update codes of question
-                self.update_question(
-                    self.cur_q, 'codes', r_text
-                )
+                self.cur_q.codes = r_text
         # [print(q) for q in self.questions.values()]
-    # update the question based on the property
-    # TODO replace function
-
-    def update_question(self, q, prop, attr):
-        match prop:
-            case 'sec_header':
-                q.sec_header = attr
-            case 'sec_desc':
-                q.sec_desc = attr
-            case 'text':
-                q.q_text = attr
-            case 'codes':
-                q.codes = attr
-            case 'tbl_q':
-                q.tbl_qs = attr
-    # TODO possibly combine function with one above
-
-    def update_tbl_qs(self, q, tbl_qs):
-        q.tbl_qs = tbl_qs
-        # [print(q) for q in tbl_qs]
 
     def is_flag(self, flag, r_text):
         # check if row text contains flag
@@ -285,37 +262,6 @@ class Parser:
     def is_q_text(self, r_text):
         # true if paragraph starts with number immediately followed by ')'
         return self.starts_with_q_num(r_text)
-
-    def get_tbl_qs(self, tbl_id):
-        # tbl qs to return
-        qs = []
-        # get table based on id
-        tbl = self.word_tables[tbl_id]
-        # header of table e.g.: Strongly agree 5, 4, ...
-        headers = list(tbl.columns)
-        # remove duplicates from headers
-        headers = list(dict.fromkeys(headers))
-        # TODO make clean_headerS function that combines remove '' and remove newline char and removes duplicates
-        # remove blank column
-        headers.remove('')
-        # remove newline character in header
-        self.remove_newline_from_headers(headers)
-        # values of 5 point scale found in first row starting at second column
-        scale = tbl.iloc[0, 1:].values.tolist()
-        # remove duplicates from scale
-        scale = list(dict.fromkeys(scale))
-        # TODO: replace with pandas vectorization
-        # iterate over questions found in first column and create table questions
-        for i, q_text in enumerate(tbl.iloc[0:, 0].values):
-            # create letter for question e.g.: A,B,C...
-            q_letter = chr(i+65)
-            tbl_q = TableQuestion(q_text, headers, q_letter, scale)
-            qs.append(tbl_q)
-        return qs
-    # TODO remove extra spaces in DK/ NA/NR
-    # TODO add <br> to text eg: Strongly<br />Disagree <br> 1
-    # TODO fix: Very Satisfied5
-
 
 class Question:
     def __init__(self, num, sec_header, sec_desc, q_text, codes, q_note, tbl_qs):
