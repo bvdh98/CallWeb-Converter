@@ -34,7 +34,8 @@ from CWConverter import CWConverter
 # TODO: add codes to docx template
 # TODO: make table question child of question class
 # TODO: read in dk and other responses from new template
-# TODO: test links in regular text
+# TODO: test links in regular text\
+# TODO: make templates for repeating surveys
 
 
 class Parser:
@@ -59,7 +60,7 @@ class Parser:
                       'q_text': '#qtext',
                       'option_start': '#ops',
                       'option_end': '#ope#',
-                      'code': '--',
+                      'code': r'^[0-9][)]|^[1-9][0-9][)]',
                       'tbl_ref': 'tbl_q:',
                       'tbl_cell': 'table cell',
                       'survey_end': '#end'
@@ -155,7 +156,7 @@ class Parser:
         self.content = self.content.sort_index().reset_index(drop=True)
 
     def clean_data(self):
-        # characters to filter out
+        # characters to replace with CallWeb recognized equivalents
         chars_to_replace = {'“': '\"', '”': '\"',
                             '’': '\'', '–': '-', '…': '...', 'é': 'e', '\s+': ' '}
         # replace all white space ('\s+') with single space.This will handle strings with consecutive white spaces
@@ -184,7 +185,7 @@ class Parser:
                 q_num = self.get_num(r_text)
                 # remove number from start of question
                 # callweb questions dont start with a number
-                r_text = self.remove_qnum(r_text)
+                r_text = self.remove_flag(r_text=r_text,flag=self.flags['q_num'],regex=True)
                 # create new question and add it to questions dictionary
                 self.questions[q_num] = Question(
                     q_num, self.cur_sec_header, self.cur_sec_desc, r_text, {}, None, [])
@@ -205,32 +206,30 @@ class Parser:
                 continue
             # ensure that there is a current question
             # checking for question code
-            elif (self.cur_q and self.is_code(r_text)):
+            elif (self.cur_q and self.is_flag(r_text=r_text,regex=True,flag=self.flags['code'])):
                 # remove code flag from row text
-                r_text = self.remove_code_flag(r_text)
+                r_text = self.remove_flag(r_text=r_text,flag=self.flags['code'],regex=True)
                 # update codes of question
                 self.cur_q.codes = r_text
         # [print(q) for q in self.questions.values()]
 
-    def is_flag(self, flag, r_text):
-        # check if row text contains flag
+    def is_flag(self, flag, r_text, regex=False):
+        #if regex is true, use regex library to look for pattern in r_text
+        if regex:
+            return re.search(flag, r_text)
+        # if regex is false check if row text contains flag
         return flag in r_text
-
-    def remove_qnum(self, r_text):
-        # replace question number 'Q1.' with space. then remove this space
-        return re.sub(self.flags['q_num'], '', r_text).strip()
 
     # get number from string
     def get_num(self, r_text):
         return re.findall(r'\d+', r_text)[0]
-
-    def remove_code_flag(self, r_text):
-        # replace code flag '--' with space. then remove this space
-        return r_text.replace(self.flags['code'], '').strip()
-
-    def is_code(self, r_text):
-        # true if question text contains code flag
-        return self.is_flag(self.flags['code'], r_text)
+    
+    def remove_flag(self, r_text, flag, regex=False):
+        #if regex is true, use regex library to remove flag from text
+        if regex:
+            return re.sub(flag, '', r_text).strip()
+        #if regex is false replace flag with white space and then remove white space
+        return r_text.replace(flag, '').strip()
 
     def check_for_section(self, row_ind):
         # get index of text column
@@ -254,14 +253,10 @@ class Parser:
         # section headers are in all caps
         return r_text.isupper()
 
-    # looking for text that starts with 'Q' followed by single or double digit followed by '.'
-    def starts_with_q_num(self, r_text):
-        return re.search(self.flags['q_num'], r_text)
-
     # TODO: possibly add conditions (question is immediately after q flag or after sec header or after sec desc)
     def is_q_text(self, r_text):
         # true if paragraph starts with number immediately followed by ')'
-        return self.starts_with_q_num(r_text)
+        return self.is_flag(flag = self.flags['q_num'],r_text=r_text,regex=True)
 
 class Question:
     def __init__(self, num, sec_header, sec_desc, q_text, codes, q_note, tbl_qs):

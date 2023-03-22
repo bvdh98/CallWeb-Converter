@@ -34,7 +34,6 @@ class CWConverter:
             t.write(f'\t#Table GRP_Q{q_num} = Q{q_num}_{first_tbl_q} - Q{q_num}_{last_tbl_q}\n')
 
     def write_codes(self,codes,f):
-        f.write('% Codes\n')
         for code,value in codes.items():
             f.write(f'\t*{code}*{value}\n')
 
@@ -69,7 +68,8 @@ class CWConverter:
                     self.write_tbl_qs(q._tbl_qs, f)
                     #append table group to table_groups.txt
                     self.append_tbl_group(q._tbl_qs,q._num)
-                #write question codes if applicable 
+                #write question codes if applicable
+                f.write('% Codes\n') 
                 if q._codes:
                     self.write_codes(q._codes,f)
                 f.write(f'% Skips\n')
