@@ -11,6 +11,7 @@ from CWConverter import CWConverter
 # section description must be between header and question
 # questions must start with Q followed by any single or double digit followed by .
 # codes must start with --
+# links in tables will not be read
 
 # TODO REMOVE unused table rows
 # TODO important test with word apostrophes and other word symbols
@@ -32,6 +33,8 @@ from CWConverter import CWConverter
 # TODO: add logging
 # TODO: add codes to docx template
 # TODO: make table question child of question class
+# TODO: read in dk and other responses from new template
+# TODO: test links in regular text
 
 
 class Parser:
@@ -39,6 +42,7 @@ class Parser:
         self.link = "./surveys/23-985 Saanich 2022 Citizen Satisfaction Survey DRAFT.docx"
         self.content = None
         self.questions = {}
+        self.tbl_qs = {}
         # TODO important change to pandas df
         self.word_tables = {}
         # keep track of current question and current section header and description iterated over
@@ -56,7 +60,7 @@ class Parser:
                       'option_start': '#ops',
                       'option_end': '#ope#',
                       'code': '--',
-                      'tbl_ref': 'word_tbl',
+                      'tbl_ref': 'tbl_q:',
                       'tbl_cell': 'table cell',
                       'survey_end': '#end'
                       }
@@ -76,9 +80,13 @@ class Parser:
         self.content = pd.DataFrame(lines, columns=['text'])
         self.clean_data()
         self.create_word_tables()
-        # self.parse()
+        self.create_table_questions()
+        self.add_tbl_qs_ref_to_content()
+        # self.content.to_csv('res.csv')
+        self.parse()
         # convert questions to callweb scw
-        # CWConverter(self.questions)
+        CWConverter(self.questions)
+    # read over tables in document and store as dictionary of dataframes
 
     def create_word_tables(self):
         doc = Document(self.link)
@@ -91,16 +99,15 @@ class Parser:
                 word_tble.index[0]).reset_index(drop=True)
             # append table to list
             self.word_tables[i] = word_tble
-            # add a reference to the table in content.csv
-            self.word_tables.to_csv('tables')
-            self.add_table_ref_to_content(word_tble.iloc[0, 0], i)
 
     def create_table_questions(self):
+        # TODO replace double loop
+        # for each table create a table question and add to tbl qs dictioanry
         for tbl in self.word_tables.values():
             headers = list(tbl.columns)
             # remove duplicates from headers
             headers = list(dict.fromkeys(headers))
-            # TODO make clean_headerS function that combines remove '' and remove newline char and removes duplicates
+            # TODO make clean_headers function that combines remove '' and remove newline char and removes duplicates
             # remove blank column
             headers.remove('')
             # remove newline character in header
@@ -109,18 +116,42 @@ class Parser:
             scale = tbl.iloc[0, 1:].values.tolist()
             # remove duplicates from scale
             scale = list(dict.fromkeys(scale))
+            # TODO: replace with pandas vectorization
+            # iterate over questions found in first column and create table questions
+            for i, q_text in enumerate(tbl.iloc[0:, 0].values):
+                # create letter for question e.g.: A,B,C...
+                q_letter = chr(i+65)
+                # remove trailing and ending white space
+                q_text = q_text.strip()
+                # create table question and add it to dictionary
+                tbl_q = TableQuestion(
+                    q_text=q_text, headers=headers, letter=q_letter, scale=scale)
+                self.tbl_qs[q_text] = tbl_q
 
-    def add_table_ref_to_content(self, first_tbl_q, tbl_id):
-        # remove trailing and ending spaces from question
-        first_tbl_q = first_tbl_q.strip()
-        # find index of row with text that matches table question
-        # then subtract 0.5 from index
-        # TODO important handle error where first table question can't be found
-        ref_indx = self.content[self.content['text'].str.contains(
-            first_tbl_q, regex=False)].index[0] - 0.5
-        tbl_ref = {'text': f'word_tbl:{tbl_id}'}
-        # append table refrence to content
-        self.content.loc[ref_indx] = tbl_ref
+    # TODO remove extra spaces in DK/ NA/NR
+    # TODO add <br> to text eg: Strongly<br />Disagree <br> 1
+    # TODO fix: Very Satisfied5
+    def remove_newline_from_headers(self, headers):
+        for header in headers:
+            # get index of header
+            indx = headers.index(header)
+            # remove newline char
+            header = header.replace('\n', '')
+            # update header in list
+            headers[indx] = header
+    # for each table question add a reference to it in the content
+
+    def add_tbl_qs_ref_to_content(self):
+        # iterate over each table question and key in dictionary
+        for k, q in self.tbl_qs.items():
+            # find index of row with text that matches table question
+            # then subtract 0.5 from index for the reference index
+            # TODO important handle error where first table question can't be found
+            ref_indx = self.content[self.content['text'].str.contains(
+                q.q_text, regex=False)].index[0] - 0.5
+            tbl_ref = {'text': f'tbl_q:{k}'}
+            # append table refrence to content
+            self.content.loc[ref_indx] = tbl_ref
         # sort table ref into correct position
         self.content = self.content.sort_index().reset_index(drop=True)
 
@@ -157,21 +188,21 @@ class Parser:
                 r_text = self.remove_qnum(r_text)
                 # create new question and add it to questions dictionary
                 self.questions[q_num] = Question(
-                    q_num, self.cur_sec_header, self.cur_sec_desc, r_text, {}, None, None)
+                    q_num, self.cur_sec_header, self.cur_sec_desc, r_text, {}, None, [])
                 # set the current question to this question
                 self.cur_q = self.questions[q_num]
             # checking for reference to table question
             elif (self.is_flag(self.flags['tbl_ref'], r_text)):
-                # extract table id from table reference
-                tbl_id = int(self.get_num(r_text))
+                # extract table id from table reference and strip trailing and starting white space
+                # table refrences are in the form: 'tbl_ref: Q1. question description/table id'
+                tbl_id = r_text.replace(self.flags['tbl_ref'], '').strip()
                 # get table questions
-                tbl_qs = self.get_tbl_qs(tbl_id)
-                self.update_tbl_qs(self.cur_q, tbl_qs)
-                # TODO improve
-                # get the table codes
-                tbl_codes = tbl_qs[0]._codes
-                # update the current question codes with the above table codes
-                self.cur_q.update_codes_from_tbl(tbl_codes)
+                tbl_q = self.tbl_qs[tbl_id]
+                # add table question to current questions list of tbl qs
+                self.update_question(self.cur_q, 'tbl_q', tbl_q)
+                # update current question codes with table q codes
+                self.cur_q.update_codes_from_tbl_q(tbl_q.codes)
+                # skip to the next row since we just updated the codes
                 continue
             # ensure that there is a current question
             # checking for question code
@@ -184,17 +215,20 @@ class Parser:
                 )
         # [print(q) for q in self.questions.values()]
     # update the question based on the property
+    # TODO replace function
 
-    def update_question(self, q, prop, r_text):
+    def update_question(self, q, prop, attr):
         match prop:
             case 'sec_header':
-                q.sec_header = r_text
+                q.sec_header = attr
             case 'sec_desc':
-                q.sec_desc = r_text
+                q.sec_desc = attr
             case 'text':
-                q.q_text = r_text
+                q.q_text = attr
             case 'codes':
-                q.codes = r_text
+                q.codes = attr
+            case 'tbl_q':
+                q.tbl_qs = attr
     # TODO possibly combine function with one above
 
     def update_tbl_qs(self, q, tbl_qs):
@@ -282,69 +316,6 @@ class Parser:
     # TODO add <br> to text eg: Strongly<br />Disagree <br> 1
     # TODO fix: Very Satisfied5
 
-    def remove_newline_from_headers(self, headers):
-        for header in headers:
-            # get index of header
-            indx = headers.index(header)
-            # remove newline char
-            header = header.replace('\n', '')
-            # update header in list
-            headers[indx] = header
-
-
-class TableQuestion:
-
-    def __init__(self, q_text, headers, q_letter, scale):
-        self._q_text = q_text
-        self._headers = headers
-        self._scale = scale
-        self._q_letter = q_letter
-        self._codes = {self._scale[i]: self._headers[i]
-                       for i in range(len(self.scale))}
-
-    def __str__(self):
-        return str(self.__class__) + '\n' + '\n'.join(('{} = {}'.format(item, self.__dict__[item]) for item in self.__dict__))
-
-    # @property
-    # def codes(self):
-    #     if(len(self.headers) != len(self.scale)):
-    #         return None
-    #     else:
-    #         return {self._scale[i]: self._headers[i]
-    #                    for i in range(len(self.scale))}
-
-    @ property
-    def q_text(self):
-        return self._q_text
-
-    @ q_text.setter
-    def q_text(self, val):
-        self._q_text = val
-
-    @ property
-    def q_letter(self):
-        return self._q_letter
-
-    @ q_letter.setter
-    def q_letter(self, val):
-        self._q_letter = val
-
-    @ property
-    def headers(self):
-        return self._headers
-
-    @ headers.setter
-    def headers(self, val):
-        self._headers = val
-
-    @ property
-    def scale(self):
-        return self._scale
-
-    @ scale.setter
-    def scale(self, val):
-        self._scale = val
-
 
 class Question:
     def __init__(self, num, sec_header, sec_desc, q_text, codes, q_note, tbl_qs):
@@ -417,7 +388,7 @@ class Question:
         else:
             self._codes[key] = val
 
-    def update_codes_from_tbl(self, tbl_codes):
+    def update_codes_from_tbl_q(self, tbl_codes):
         self._codes = tbl_codes
 
     @ property
@@ -434,7 +405,8 @@ class Question:
 
     @ tbl_qs.setter
     def tbl_qs(self, val):
-        self._tbl_qs = val
+        # print(val)
+        self._tbl_qs.append(val)
     # TODO move function out of Question class
 
     def is_special_code(self, option, flags):
@@ -442,6 +414,25 @@ class Question:
             if flag in option.lower():
                 return True
         return False
+
+
+class TableQuestion(Question):
+    def __init__(self, num=None, letter=None, sec_header=None, sec_desc=None, q_text=None, codes={}, q_note=None, tbl_qs=[], headers=[], scale=[]):
+        self._headers = headers
+        self._scale = scale
+        self._letter = letter
+        Question.__init__(self, num, sec_header, sec_desc,
+                          q_text, codes, q_note, tbl_qs)
+
+    @property
+    def codes(self):
+        # check to make sure headers and scale are same length to avoid index out of bounds error
+        if (len(self._headers) != len(self._scale)):
+            return None
+        else:
+            # return codes as a dictionary of scale followed by header eg: 5: Very satisfied
+            return {self._scale[i]: self._headers[i]
+                    for i in range(len(self._scale))}
 
 
 if __name__ == '__main__':

@@ -13,10 +13,11 @@ class CWConverter:
         self._survey = val
     #TODO: make generic function for write_tbl_qs and write_codes
     #TODO: important handle cases where prop == None (section header, description, codes)
+    #TODO: replace with properties, eg: q.letter instead of q._letter
     def write_tbl_qs(self, qs, f):
         #for each table question write out callweb suffix code, eg: "[SUFFIX:_A] question description"
         for q in qs:
-            f.write(f'\t[SUFFIX:_{q._q_letter}]{q._q_text}\n')
+            f.write(f'\t[SUFFIX:_{q._letter}]{q.q_text}\n')
     #create text file to store call web code for table groups
     def create_tbl_doc(self):
         with open('table_groups.txt', 'w+') as t:
@@ -24,9 +25,9 @@ class CWConverter:
 
     def append_tbl_group(self,qs,q_num):
         #get first table question
-        first_tbl_q = qs[0]._q_letter
+        first_tbl_q = qs[0]._letter
         #get last table question
-        last_tbl_q = qs[-1]._q_letter
+        last_tbl_q = qs[-1]._letter
         #append to text document the associated callweb code
         with open('table_groups.txt', 'a') as t:
             t.write(f'\n\t#Group GRP_Q{q_num} = Q{q_num}_{first_tbl_q} - Q{q_num}_{last_tbl_q}\n')
@@ -68,8 +69,9 @@ class CWConverter:
                     self.write_tbl_qs(q._tbl_qs, f)
                     #append table group to table_groups.txt
                     self.append_tbl_group(q._tbl_qs,q._num)
-                #write question codes
-                self.write_codes(q._codes,f)
+                #write question codes if applicable 
+                if q._codes:
+                    self.write_codes(q._codes,f)
                 f.write(f'% Skips\n')
                 f.write(f'% Condition\n')
                 #if question has open-ended option write callweb code for comment box
