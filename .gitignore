@@ -4,9 +4,16 @@
 *.xlsx
 *R
 *html
+*htm
+*xml
+*png
+*gif
+*thmx
 table_groups.txt
 test.ipynb
 docx_xml_processing.py
 Parser.py
 .vscode
 __pycache__
+surveys
+23-985 Saanich 2022 Citizen Satisfaction Survey DRAFT_files

@@ -34,7 +34,7 @@ from CWConverter import CWConverter
 # TODO: add codes to docx template
 # TODO: make table question child of question class
 # TODO: read in dk and other responses from new template
-# TODO: test links in regular text\
+# TODO: test links in regular text
 # TODO: make templates for repeating surveys
 
 
@@ -63,7 +63,8 @@ class Parser:
                       'code': r'^[0-9][)]|^[1-9][0-9][)]',
                       'tbl_ref': 'tbl_q:',
                       'tbl_cell': 'table cell',
-                      'survey_end': '#end'
+                      'survey_end': '#end',
+                      'q_ineligible': 'Q-INELIGIBLE'
                       }
         self.main()
 
@@ -76,17 +77,14 @@ class Parser:
     def main(self):
         document = docx2python(self.link)
         # convert document to list sepparated by end of line character
-        lines = document.text.split('\n')
-        # turn list into data frame
-        self.content = pd.DataFrame(lines, columns=['text'])
-        self.clean_data()
+        self.content = self.get_clean_data(document.text)
         self.create_word_tables()
         self.create_table_questions()
         self.add_tbl_qs_ref_to_content()
-        # self.content.to_csv('res.csv')
-        self.parse()
+        # df = pd.DataFrame(self.content, columns=['text'])
+        # df.to_csv('res.csv')
         # convert questions to callweb scw
-        CWConverter(self.questions)
+        # CWConverter(self.questions)
     # read over tables in document and store as dictionary of dataframes
 
     def create_word_tables(self):
@@ -141,36 +139,30 @@ class Parser:
             # update header in list
             headers[indx] = header
     # for each table question add a reference to it in the content
+
     def add_tbl_qs_ref_to_content(self):
         # iterate over each table question and key in dictionary
         for k, q in self.tbl_qs.items():
             # find index of row with text that matches table question
-            # then subtract 0.5 from index for the reference index
+            # then subtract 1 from index to place the referenece before the text
             # TODO important handle error where first table question can't be found
-            ref_indx = self.content[self.content['text'].str.contains(
-                q.q_text, regex=False)].index[0] - 0.5
-            tbl_ref = {'text': f'tbl_q:{k}'}
-            # append table refrence to content
-            self.content.loc[ref_indx] = tbl_ref
-        # sort table ref into correct position
-        self.content = self.content.sort_index().reset_index(drop=True)
+            ref_indx = self.content.index(q.q_text)-1
+            #avoid index out of bounds error
+            if ref_indx >= 0:
+                self.content[ref_indx] = f'tbl_q:{k}'
 
-    def clean_data(self):
+    def get_clean_data(self, data):
         # characters to replace with CallWeb recognized equivalents
         chars_to_replace = {'“': '\"', '”': '\"',
-                            '’': '\'', '–': '-', '…': '...', 'é': 'e', '\s+': ' '}
-        # replace all white space ('\s+') with single space.This will handle strings with consecutive white spaces
-        # replace all docx characters above with callweb recognized equivalents
-        self.content.replace({'text': chars_to_replace},
-                             regex=True, inplace=True)
-        # remove white space at start and end of string
-        self.content = self.content['text'].str.strip()
-        # convert content back to dataframe
-        self.content = self.content.to_frame()
-        # replace all whitespace with NAN
-        self.content.replace('', np.nan, inplace=True)
-        # drop NAN rows
-        self.content.dropna(inplace=True)
+                            '’': '\'', '–': '-', '…': '...', 'é': 'e', '\t': ''}
+        #replace each character in dictionary above
+        for k, v in chars_to_replace.items():
+            data = [str.replace(k, v) for str in data]
+        #convert back to string and then split the lines into a list 
+        data = ''.join(data).split('\n')
+        #remove spaces from each line if its not an empty string
+        data = [str.strip() for str in data if str != '']
+        return data
 
     def parse(self):
         # iterate over each row in data frame
@@ -185,12 +177,17 @@ class Parser:
                 q_num = self.get_num(r_text)
                 # remove number from start of question
                 # callweb questions dont start with a number
-                r_text = self.remove_flag(r_text=r_text,flag=self.flags['q_num'],regex=True)
+                r_text = self.remove_flag(
+                    r_text=r_text, flag=self.flags['q_num'], regex=True)
                 # create new question and add it to questions dictionary
                 self.questions[q_num] = Question(
-                    q_num, self.cur_sec_header, self.cur_sec_desc, r_text, {}, None, [])
+                    num=q_num, sec_header=self.cur_sec_header, sec_desc=self.cur_sec_desc, q_text=r_text)
                 # set the current question to this question
                 self.cur_q = self.questions[q_num]
+            elif (self.is_flag(self.flags['q-ineligible'], r_text)):
+                # check if previous rows are related to the survey section
+                self.check_for_section(row.Index)
+
             # checking for reference to table question
             elif (self.is_flag(self.flags['tbl_ref'], r_text)):
                 # extract table id from table reference and strip trailing and starting white space
@@ -206,15 +203,16 @@ class Parser:
                 continue
             # ensure that there is a current question
             # checking for question code
-            elif (self.cur_q and self.is_flag(r_text=r_text,regex=True,flag=self.flags['code'])):
+            elif (self.cur_q and self.is_flag(r_text=r_text, regex=True, flag=self.flags['code'])):
                 # remove code flag from row text
-                r_text = self.remove_flag(r_text=r_text,flag=self.flags['code'],regex=True)
+                r_text = self.remove_flag(
+                    r_text=r_text, flag=self.flags['code'], regex=True)
                 # update codes of question
                 self.cur_q.codes = r_text
         # [print(q) for q in self.questions.values()]
 
     def is_flag(self, flag, r_text, regex=False):
-        #if regex is true, use regex library to look for pattern in r_text
+        # if regex is true, use regex library to look for pattern in r_text
         if regex:
             return re.search(flag, r_text)
         # if regex is false check if row text contains flag
@@ -223,12 +221,12 @@ class Parser:
     # get number from string
     def get_num(self, r_text):
         return re.findall(r'\d+', r_text)[0]
-    
+
     def remove_flag(self, r_text, flag, regex=False):
-        #if regex is true, use regex library to remove flag from text
+        # if regex is true, use regex library to remove flag from text
         if regex:
             return re.sub(flag, '', r_text).strip()
-        #if regex is false replace flag with white space and then remove white space
+        # if regex is false replace flag with white space and then remove white space
         return r_text.replace(flag, '').strip()
 
     def check_for_section(self, row_ind):
@@ -256,10 +254,11 @@ class Parser:
     # TODO: possibly add conditions (question is immediately after q flag or after sec header or after sec desc)
     def is_q_text(self, r_text):
         # true if paragraph starts with number immediately followed by ')'
-        return self.is_flag(flag = self.flags['q_num'],r_text=r_text,regex=True)
+        return self.is_flag(flag=self.flags['q_num'], r_text=r_text, regex=True)
+
 
 class Question:
-    def __init__(self, num, sec_header, sec_desc, q_text, codes, q_note, tbl_qs):
+    def __init__(self, num='', sec_header=None, sec_desc=None, q_text=None, codes={}, q_note=None, tbl_qs=[]):
         self._num = num
         self._sec_header = sec_header
         self._sec_desc = sec_desc
@@ -277,6 +276,9 @@ class Question:
     # print out object in nicer format
     def __str__(self):
         return str(self.__class__) + '\n' + '\n'.join(('{} = {}'.format(item, self.__dict__[item]) for item in self.__dict__))
+
+    def print_missing_data(self):
+        pass
 
     @ property
     def sec_header(self):
