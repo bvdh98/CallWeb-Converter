@@ -83,8 +83,9 @@ class Parser:
         self.add_tbl_qs_ref_to_content()
         # df = pd.DataFrame(self.content, columns=['text'])
         # df.to_csv('res.csv')
+        self.parse()
         # convert questions to callweb scw
-        # CWConverter(self.questions)
+        CWConverter(self.questions)
     # read over tables in document and store as dictionary of dataframes
 
     def create_word_tables(self):
@@ -147,7 +148,7 @@ class Parser:
             # then subtract 1 from index to place the referenece before the text
             # TODO important handle error where first table question can't be found
             ref_indx = self.content.index(q.q_text)-1
-            #avoid index out of bounds error
+            # avoid index out of bounds error
             if ref_indx >= 0:
                 self.content[ref_indx] = f'tbl_q:{k}'
 
@@ -155,44 +156,38 @@ class Parser:
         # characters to replace with CallWeb recognized equivalents
         chars_to_replace = {'“': '\"', '”': '\"',
                             '’': '\'', '–': '-', '…': '...', 'é': 'e', '\t': ''}
-        #replace each character in dictionary above
+        # replace each character in dictionary above
         for k, v in chars_to_replace.items():
             data = [str.replace(k, v) for str in data]
-        #convert back to string and then split the lines into a list 
+        # convert back to string and then split the lines into a list
         data = ''.join(data).split('\n')
-        #remove spaces from each line if its not an empty string
+        # remove spaces from each line if its not an empty string
         data = [str.strip() for str in data if str != '']
         return data
 
     def parse(self):
         # iterate over each row in data frame
-        for row in self.content.itertuples():
-            # get value in text column
-            r_text = getattr(row, 'text')
+        for line_num, line in enumerate(self.content):
             # check if row is question text, eg: 1) the......
-            if (self.is_q_text(r_text)):
+            if (self.is_q_text(line)):
                 # check if previous rows are related to the survey section
-                self.check_for_section(row.Index)
+                self.check_for_section(line_num)
                 # get number from start of question
-                q_num = self.get_num(r_text)
+                q_num = self.get_num(line)
                 # remove number from start of question
                 # callweb questions dont start with a number
-                r_text = self.remove_flag(
-                    r_text=r_text, flag=self.flags['q_num'], regex=True)
+                line = self.remove_flag(
+                    line=line, flag=self.flags['q_num'], regex=True)
                 # create new question and add it to questions dictionary
                 self.questions[q_num] = Question(
-                    num=q_num, sec_header=self.cur_sec_header, sec_desc=self.cur_sec_desc, q_text=r_text)
+                    num=q_num, sec_header=self.cur_sec_header, sec_desc=self.cur_sec_desc, q_text=line, codes={}, tbl_qs=[])
                 # set the current question to this question
                 self.cur_q = self.questions[q_num]
-            elif (self.is_flag(self.flags['q-ineligible'], r_text)):
-                # check if previous rows are related to the survey section
-                self.check_for_section(row.Index)
-
             # checking for reference to table question
-            elif (self.is_flag(self.flags['tbl_ref'], r_text)):
+            elif (self.is_flag(self.flags['tbl_ref'], line)):
                 # extract table id from table reference and strip trailing and starting white space
                 # table refrences are in the form: 'tbl_ref: Q1. question description/table id'
-                tbl_id = r_text.replace(self.flags['tbl_ref'], '').strip()
+                tbl_id = line.replace(self.flags['tbl_ref'], '').strip()
                 # get table questions
                 tbl_q = self.tbl_qs[tbl_id]
                 # add table question to current questions list of tbl qs
@@ -203,58 +198,56 @@ class Parser:
                 continue
             # ensure that there is a current question
             # checking for question code
-            elif (self.cur_q and self.is_flag(r_text=r_text, regex=True, flag=self.flags['code'])):
+            elif (self.cur_q and self.is_flag(line=line, regex=True, flag=self.flags['code'])):
                 # remove code flag from row text
-                r_text = self.remove_flag(
-                    r_text=r_text, flag=self.flags['code'], regex=True)
+                line = self.remove_flag(
+                    line=line, flag=self.flags['code'], regex=True)
                 # update codes of question
-                self.cur_q.codes = r_text
-        # [print(q) for q in self.questions.values()]
+                self.cur_q.codes = line
+        [print(q) for q in self.questions.values()]
 
-    def is_flag(self, flag, r_text, regex=False):
-        # if regex is true, use regex library to look for pattern in r_text
+    def is_flag(self, flag, line, regex=False):
+        # if regex is true, use regex library to look for pattern in line
         if regex:
-            return re.search(flag, r_text)
+            return re.search(flag, line)
         # if regex is false check if row text contains flag
-        return flag in r_text
+        return flag in line
 
     # get number from string
-    def get_num(self, r_text):
-        return re.findall(r'\d+', r_text)[0]
+    def get_num(self, line):
+        return re.findall(r'\d+', line)[0]
 
-    def remove_flag(self, r_text, flag, regex=False):
+    def remove_flag(self, line, flag, regex=False):
         # if regex is true, use regex library to remove flag from text
         if regex:
-            return re.sub(flag, '', r_text).strip()
+            return re.sub(flag, '', line).strip()
         # if regex is false replace flag with white space and then remove white space
-        return r_text.replace(flag, '').strip()
+        return line.replace(flag, '').strip()
 
-    def check_for_section(self, row_ind):
-        # get index of text column
-        text_ind = self.content.columns.get_loc('text')
+    def check_for_section(self, line_num):
         # get previous row
-        prev_rt = self.content.iloc[row_ind-1, text_ind]
+        prev_line = self.content[line_num-1]
         # get row before previous row
-        sec_prev_rt = self.content.iloc[row_ind-2, text_ind]
+        sec_prev_line = self.content[line_num-2]
         # check if second previous row is section header
-        if (self.is_sec_header(sec_prev_rt)):
+        if (self.is_sec_header(sec_prev_line)):
             # set current section header to second prev row
-            self.cur_sec_header = sec_prev_rt
+            self.cur_sec_header = sec_prev_line
             # set the section description to prev row
             # by default the section description is after the header
-            self.cur_sec_desc = prev_rt
+            self.cur_sec_desc = prev_line
         # check if previous row is section header
-        elif (self.is_sec_header(prev_rt)):
-            self.cur_sec_header = prev_rt
+        elif (self.is_sec_header(prev_line)):
+            self.cur_sec_header = prev_line
 
-    def is_sec_header(self, r_text):
+    def is_sec_header(self, line):
         # section headers are in all caps
-        return r_text.isupper()
+        return line.isupper()
 
     # TODO: possibly add conditions (question is immediately after q flag or after sec header or after sec desc)
-    def is_q_text(self, r_text):
+    def is_q_text(self, line):
         # true if paragraph starts with number immediately followed by ')'
-        return self.is_flag(flag=self.flags['q_num'], r_text=r_text, regex=True)
+        return self.is_flag(flag=self.flags['q_num'], line=line, regex=True)
 
 
 class Question:
