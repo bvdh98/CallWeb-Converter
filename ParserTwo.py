@@ -4,6 +4,7 @@ from docx import Document
 import pandas as pd
 import numpy as np
 from CWConverter import CWConverter
+from bs4 import BeautifulSoup
 
 # REQUIREMENTS:
 # dont format regular questions as tables like in saanich citz survey
@@ -36,6 +37,7 @@ from CWConverter import CWConverter
 # TODO: read in dk and other responses from new template
 # TODO: test links in regular text
 # TODO: make templates for repeating surveys
+# TODO: IMPORTANT fix error where previous section description is added to new question
 
 
 class Parser:
@@ -239,6 +241,7 @@ class Parser:
         # check if previous row is section header
         elif (self.is_sec_header(prev_line)):
             self.cur_sec_header = prev_line
+            self.cur_sec_desc = None
 
     def is_sec_header(self, line):
         # section headers are in all caps
@@ -251,7 +254,7 @@ class Parser:
 
 
 class Question:
-    def __init__(self, num='', sec_header=None, sec_desc=None, q_text=None, codes={}, q_note=None, tbl_qs=[]):
+    def __init__(self, num=None, sec_header=None, sec_desc=None, q_text=None, codes={}, q_note=None, tbl_qs=[]):
         self._num = num
         self._sec_header = sec_header
         self._sec_desc = sec_desc
