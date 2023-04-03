@@ -11,7 +11,6 @@ from bs4 import BeautifulSoup
 # section header must be all caps not bold which makes text look all caps
 # section description must be between header and question
 # questions must start with Q followed by any single or double digit followed by .
-# codes must start with --
 # links in tables will not be read
 
 # TODO REMOVE unused table rows
@@ -37,12 +36,12 @@ from bs4 import BeautifulSoup
 # TODO: read in dk and other responses from new template
 # TODO: test links in regular text
 # TODO: make templates for repeating surveys
-# TODO: IMPORTANT fix error where previous section description is added to new question
+# TODO: important handle error where user doesn't pass in word doc
 
 
 class Parser:
     def __init__(self):
-        self.link = "./surveys/23-985 Saanich 2022 Citizen Satisfaction Survey DRAFT.docx"
+        self.link = "./surveys/survey.docx"
         self.content = None
         self.questions = {}
         self.tbl_qs = {}
@@ -145,14 +144,19 @@ class Parser:
 
     def add_tbl_qs_ref_to_content(self):
         # iterate over each table question and key in dictionary
-        for k, q in self.tbl_qs.items():
+        for q in self.tbl_qs.keys():
             # find index of row with text that matches table question
             # then subtract 1 from index to place the referenece before the text
             # TODO important handle error where first table question can't be found
-            ref_indx = self.content.index(q.q_text)-1
+            try:
+                ref_indx = self.content.index(q)-1
+            except Exception:
+                print(f'''Could not convert the table question: \"{q}\" to CallWeb. 
+                Please refer to the README on how to structure table questions\n''')
+                continue
             # avoid index out of bounds error
             if ref_indx >= 0:
-                self.content[ref_indx] = f'tbl_q:{k}'
+                self.content[ref_indx] = f'tbl_q:{q}'
 
     def get_clean_data(self, data):
         # characters to replace with CallWeb recognized equivalents
@@ -206,7 +210,7 @@ class Parser:
                     line=line, flag=self.flags['code'], regex=True)
                 # update codes of question
                 self.cur_q.codes = line
-        [print(q) for q in self.questions.values()]
+        # [print(q) for q in self.questions.values()]
 
     def is_flag(self, flag, line, regex=False):
         # if regex is true, use regex library to look for pattern in line
