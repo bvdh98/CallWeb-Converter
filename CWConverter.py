@@ -14,6 +14,8 @@ class CWConverter:
     # TODO: make generic function for write_tbl_qs and write_codes
     # TODO: important handle cases where prop == None (section header, description, codes)
     # TODO: replace with properties, eg: q.letter instead of q._letter
+    # TODO: important tell user where to place code in full scw
+    # TODO: add qcomp question to end
 
     def write_tbl_qs(self, qs, f):
         # for each table question write out callweb suffix code, eg: "[SUFFIX:_A] question description"
@@ -42,23 +44,14 @@ class CWConverter:
             f.write(f'\t*{code}*{value}\n')
 
     def print_skipped_qs(self):
-        #get list of survey questions
+        # get list of survey questions
         keys = list(self.survey.keys())
-        #notify user of questions not found in list
-        [print(f'question {q} was skipped over. Please refer to the README to on how to structure your questions')
+        # notify user of questions not found in list
+        [print(f'question {q} was skipped over. Please refer to the README to on how to structure your questions\n')
          for q in range(keys[0], keys[-1]+1) if q not in keys]
 
-    def main(self):
-        # if no questions were parsed, let the user know
-        if (len(self.survey) == 0):
-            print(
-                'Could not convert any questions in the survey to CallWeb. Please refer to the README on how to structure your survey')
-            return
-        # create table section
-        self.create_tbl_doc()
-        self.print_skipped_qs()
-
-        # iterate through each question in survey and convert into callweb scw file
+    def write_callweb_code(self):
+        # iterate through each question in survey and convert into callweb code
         with open('survey.scw', 'w+') as f:
             for q in self.survey.values():
                 # TODO: check for when to set MIN or MAX to different val eg: Multi selects
@@ -91,3 +84,20 @@ class CWConverter:
                 else:
                     f.write(f'% Open end\n')
                 f.write(f'{self.end_of_q}\n\n')
+
+    def main(self):
+        # if no questions were parsed, let the user know
+        if (len(self.survey) == 0):
+            print(
+                'Could not convert any questions in the survey to CallWeb.'\
+                'Please refer to the README on how to structure your survey\n')
+            return
+        # create table section
+        self.create_tbl_doc()
+        self.print_skipped_qs()
+        self.write_callweb_code()
+        print(
+            'The survey was successfully converted to CallWeb code. '\
+            'Please look over the code in survey.scw and table_groups.txt'\
+            'Note: the code in survey.scw may not be correct if you did not follow the template.'\
+            'Please refer to the README for more information.')

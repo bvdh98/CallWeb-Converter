@@ -4,7 +4,7 @@ from docx import Document
 import pandas as pd
 import numpy as np
 from CWConverter import CWConverter
-from bs4 import BeautifulSoup
+# from bs4 import BeautifulSoup
 
 # REQUIREMENTS:
 # dont format regular questions as tables like in saanich citz survey
@@ -37,6 +37,7 @@ from bs4 import BeautifulSoup
 # TODO: test links in regular text
 # TODO: make templates for repeating surveys
 # TODO: important handle error where user doesn't pass in word doc
+# TODO: important handle error where user currently in scw or tables
 
 
 class Parser:
@@ -77,7 +78,7 @@ class Parser:
 
     def main(self):
         document = docx2python(self.link)
-        # convert document to list sepparated by end of line character
+        # convert document to list with clean data
         self.content = self.get_clean_data(document.text)
         self.create_word_tables()
         self.create_table_questions()
@@ -106,15 +107,24 @@ class Parser:
         # for each table create a table question and add to tbl qs dictioanry
         for tbl in self.word_tables.values():
             headers = list(tbl.columns)
-            # remove duplicates from headers
-            headers = list(dict.fromkeys(headers))
-            # TODO make clean_headers function that combines remove '' and remove newline char and removes duplicates
-            # remove blank column
-            headers.remove('')
-            # remove newline character in header
-            self.remove_newline_from_headers(headers)
-            # values of 5 point scale found in first row starting at second column
-            scale = tbl.iloc[0, 1:].values.tolist()
+            headers = self.clean_headers(headers)
+            #headers may be empty if table isn't structured properly
+            if headers == None:
+                #notify user about issue and move to next table
+                print(
+                    f"Could not read the table with the question \"{tbl.iloc[0, 0]}\"."\
+                    "Please refer to the README on how to structure table questions.\n")
+                continue
+            try:
+                # values of 5 point scale found in first row starting at second column
+                scale = tbl.iloc[0, 1:].values.tolist()
+                #scale may be empty if table isn't structured properly
+            except:
+                #notify user about issue and move to next table
+                print(
+                    f"Could not read the table with the question \"{tbl.iloc[0, 0]}\"."\
+                    "Please refer to the README on how to structure table questions.\n")
+                continue
             # remove duplicates from scale
             scale = list(dict.fromkeys(scale))
             # TODO: replace with pandas vectorization
@@ -129,14 +139,25 @@ class Parser:
                     q_text=q_text, headers=headers, letter=q_letter, scale=scale)
                 self.tbl_qs[q_text] = tbl_q
 
+    def clean_headers(self, headers):
+        # remove duplicates from headers
+        headers = list(dict.fromkeys(headers))
+        # remove blank column if it exsists
+        if '' in headers:
+            headers.remove('')
+        # remove newline character in header
+        self.remove_newline_from_headers(headers)
+        return headers
+
     # TODO remove extra spaces in DK/ NA/NR
     # TODO add <br> to text eg: Strongly<br />Disagree <br> 1
     # TODO fix: Very Satisfied5
+
     def remove_newline_from_headers(self, headers):
         for header in headers:
             # get index of header
             indx = headers.index(header)
-            # remove newline char
+            # remove newline character
             header = header.replace('\n', '')
             # update header in list
             headers[indx] = header
@@ -147,12 +168,12 @@ class Parser:
         for q in self.tbl_qs.keys():
             # find index of row with text that matches table question
             # then subtract 1 from index to place the referenece before the text
-            #if table question can't be found, notify the user
             try:
                 ref_indx = self.content.index(q)-1
             except Exception:
-                print(f'''Could not convert the table question: \"{q}\" to CallWeb.
-                Please refer to the README on how to structure table questions\n''')
+                # if table question can't be found, notify the user
+                print(f'Could not convert the table question: \"{q}\" to CallWeb.'\
+                      'Please refer to the README on how to structure table questions\n')
                 continue
             # avoid index out of bounds error
             if ref_indx >= 0:
@@ -189,8 +210,9 @@ class Parser:
                     num=q_num, sec_header=self.cur_sec_header, sec_desc=self.cur_sec_desc, q_text=line, codes={}, tbl_qs=[])
                 # set the current question to this question
                 self.cur_q = self.questions[q_num]
+            # ensure that there is a current question to avoid none type error
             # checking for reference to table question
-            elif (self.is_flag(self.flags['tbl_ref'], line)):
+            elif (self.cur_q and self.is_flag(self.flags['tbl_ref'], line)):
                 # extract table id from table reference and strip trailing and starting white space
                 # table refrences are in the form: 'tbl_ref: Q1. question description/table id'
                 tbl_id = line.replace(self.flags['tbl_ref'], '').strip()
@@ -202,7 +224,7 @@ class Parser:
                 self.cur_q.update_codes_from_tbl_q(tbl_q.codes)
                 # skip to the next row since we just updated the codes
                 continue
-            # ensure that there is a current question
+            # ensure that there is a current question to avoid none type error
             # checking for question code
             elif (self.cur_q and self.is_flag(line=line, regex=True, flag=self.flags['code'])):
                 # remove code flag from row text
@@ -276,9 +298,6 @@ class Question:
     # print out object in nicer format
     def __str__(self):
         return str(self.__class__) + '\n' + '\n'.join(('{} = {}'.format(item, self.__dict__[item]) for item in self.__dict__))
-
-    def print_missing_data(self):
-        pass
 
     @ property
     def sec_header(self):
