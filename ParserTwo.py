@@ -14,7 +14,7 @@ from bs4 import BeautifulSoup
 # links in tables will not be read
 
 # TODO REMOVE unused table rows
-# TODO important test with word apostrophes and other word symbols
+# TODO: important test with word apostrophes and other word symbols
 # TODO make ui prompt
 # TODO update note property of question
 # TODO add callweb code for comment boxes underneath please specify ()
@@ -45,7 +45,7 @@ class Parser:
         self.content = None
         self.questions = {}
         self.tbl_qs = {}
-        # TODO important change to pandas df
+        # TODO: important change to pandas df
         self.word_tables = {}
         # keep track of current question and current section header and description iterated over
         self.cur_q = None
@@ -143,15 +143,15 @@ class Parser:
     # for each table question add a reference to it in the content
 
     def add_tbl_qs_ref_to_content(self):
-        # iterate over each table question and key in dictionary
+        # iterate over each table question in dictionary
         for q in self.tbl_qs.keys():
             # find index of row with text that matches table question
             # then subtract 1 from index to place the referenece before the text
-            # TODO important handle error where first table question can't be found
+            #if table question can't be found, notify the user
             try:
                 ref_indx = self.content.index(q)-1
             except Exception:
-                print(f'''Could not convert the table question: \"{q}\" to CallWeb. 
+                print(f'''Could not convert the table question: \"{q}\" to CallWeb.
                 Please refer to the README on how to structure table questions\n''')
                 continue
             # avoid index out of bounds error
@@ -221,7 +221,7 @@ class Parser:
 
     # get number from string
     def get_num(self, line):
-        return re.findall(r'\d+', line)[0]
+        return int(re.findall(r'\d+', line)[0])
 
     def remove_flag(self, line, flag, regex=False):
         # if regex is true, use regex library to remove flag from text

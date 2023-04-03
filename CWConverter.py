@@ -41,17 +41,22 @@ class CWConverter:
         for code, value in codes.items():
             f.write(f'\t*{code}*{value}\n')
 
-    def print_missing_data(self):
+    def print_skipped_qs(self):
+        #get list of survey questions
         keys = list(self.survey.keys())
-        [print(q) for q in range(keys[0], keys[-1]+1) if q not in keys]
+        #notify user of questions not found in list
+        [print(f'question {q} was skipped over. Please refer to the README to on how to structure your questions')
+         for q in range(keys[0], keys[-1]+1) if q not in keys]
 
     def main(self):
+        # if no questions were parsed, let the user know
         if (len(self.survey) == 0):
             print(
                 'Could not convert any questions in the survey to CallWeb. Please refer to the README on how to structure your survey')
             return
         # create table section
         self.create_tbl_doc()
+        self.print_skipped_qs()
 
         # iterate through each question in survey and convert into callweb scw file
         with open('survey.scw', 'w+') as f:
