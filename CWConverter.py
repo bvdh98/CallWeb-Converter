@@ -103,6 +103,6 @@ class CWConverter:
         self.write_callweb_code()
         print(
             'The survey was successfully converted to CallWeb code. '\
-            'Please look over the code in survey.scw and table_groups.txt'\
+            'Please look over the code in survey.scw and table_groups.txt. '\
             'Note: the code produced may not be correct if you did not follow the template.'\
             'Please refer to the README for more information.')

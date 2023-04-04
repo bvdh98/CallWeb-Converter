@@ -13,7 +13,7 @@ from CWConverter import CWConverter
 # questions must start with Q followed by any single or double digit followed by .
 # links in tables will not be read
 
-# TODO REMOVE unused table rows
+# TODO REMOVE unused table lines
 # TODO: important test with word apostrophes and other word symbols
 # TODO: important make ui prompt
 # TODO update note property of question
@@ -48,10 +48,6 @@ class Parser:
         self.tbl_qs = {}
         # TODO: important change to pandas df
         self.word_tables = {}
-        # keep track of current question and current section header and description iterated over
-        self.cur_q = None
-        self.cur_sec_header = None
-        self.cur_sec_desc = None
         self.flags = {'q_num': r'^[Q][0-9][.]|^[Q][1-9][0-9][.]',
                       'sec_header_start': '#qhs',
                       'sec_header_end': '#qhe#',
@@ -108,21 +104,21 @@ class Parser:
         for tbl in self.word_tables.values():
             headers = list(tbl.columns)
             headers = self.clean_headers(headers)
-            #headers may be empty if table isn't structured properly
+            # headers may be empty if table isn't structured properly
             if headers == None:
-                #notify user about issue and move to next table
+                # notify user about issue and move to next table
                 print(
-                    f"Could not read the table with the question \"{tbl.iloc[0, 0]}\"."\
+                    f"Could not read the table with the question \"{tbl.iloc[0, 0]}\"."
                     "Please refer to the README on how to structure table questions.\n")
                 continue
             try:
                 # values of 5 point scale found in first row starting at second column
                 scale = tbl.iloc[0, 1:].values.tolist()
-                #scale may be empty if table isn't structured properly
+                # scale may be empty if table isn't structured properly
             except:
-                #notify user about issue and move to next table
+                # notify user about issue and move to next table
                 print(
-                    f"Could not read the table with the question \"{tbl.iloc[0, 0]}\"."\
+                    f"Could not read the table with the question \"{tbl.iloc[0, 0]}\"."
                     "Please refer to the README on how to structure table questions.\n")
                 continue
             # remove duplicates from scale
@@ -166,13 +162,13 @@ class Parser:
     def add_tbl_qs_ref_to_content(self):
         # iterate over each table question in dictionary
         for q in self.tbl_qs.keys():
-            # find index of row with text that matches table question
+            # find index of text that matches table question
             # then subtract 1 from index to place the referenece before the text
             try:
                 ref_indx = self.content.index(q)-1
             except Exception:
                 # if table question can't be found, notify the user
-                print(f'Could not convert the table question: \"{q}\" to CallWeb.'\
+                print(f'Could not convert the table question: \"{q}\" to CallWeb.'
                       'Please refer to the README on how to structure table questions\n')
                 continue
             # avoid index out of bounds error
@@ -193,12 +189,24 @@ class Parser:
         return data
 
     def parse(self):
-        # iterate over each row in data frame
-        for line_num, line in enumerate(self.content):
-            # check if row is question text, eg: 1) the......
-            if (self.is_q_text(line)):
-                # check if previous rows are related to the survey section
-                self.check_for_section(line_num)
+        #keep track of last line iterated over
+        last_line = None
+        # keep track of current question and current section header and description iterated over
+        cur_sec_header = None
+        cur_sec_desc = None
+        cur_q = None
+        # iterate over each line
+        for line in self.content:
+            #check if line is section header
+            if(line.isupper()):
+                #update section header
+                cur_sec_header = line
+                #update last line flag
+                last_line = 'sec_header'
+                #skip to next line
+                continue
+            # check if line is question text, eg: 1) the......
+            elif (self.is_q_text(line)):
                 # get number from start of question
                 q_num = self.get_num(line)
                 # remove number from start of question
@@ -207,38 +215,52 @@ class Parser:
                     line=line, flag=self.flags['q_num'], regex=True)
                 # create new question and add it to questions dictionary
                 self.questions[q_num] = Question(
-                    num=q_num, sec_header=self.cur_sec_header, sec_desc=self.cur_sec_desc, q_text=line, codes={}, tbl_qs=[])
+                    num=q_num, sec_header=cur_sec_header, sec_desc=cur_sec_desc, q_text=line, codes={}, tbl_qs=[])
                 # set the current question to this question
-                self.cur_q = self.questions[q_num]
+                cur_q = self.questions[q_num]
+                #reset the section description for next question
+                cur_sec_desc = None
+                last_line = 'q_text'
+                # skip to the next line
+                continue
+            #if the last line is a section header and this current line is not question text, update section header to this line
+            elif(last_line == 'sec_header'):
+                cur_sec_desc = line
+                last_line = 'sec_desc'
+                continue
             # ensure that there is a current question to avoid none type error
             # checking for reference to table question
-            elif (self.cur_q and self.is_flag(self.flags['tbl_ref'], line)):
+            elif (cur_q and self.is_flag(self.flags['tbl_ref'], line)):
                 # extract table id from table reference and strip trailing and starting white space
                 # table refrences are in the form: 'tbl_ref: Q1. question description/table id'
                 tbl_id = line.replace(self.flags['tbl_ref'], '').strip()
                 # get table questions
                 tbl_q = self.tbl_qs[tbl_id]
                 # add table question to current questions list of tbl qs
-                self.cur_q.tbl_qs = tbl_q
+                cur_q.tbl_qs = tbl_q
                 # update current question codes with table q codes
-                self.cur_q.update_codes_from_tbl_q(tbl_q.codes)
-                # skip to the next row since we just updated the codes
+                cur_q.update_codes_from_tbl_q(tbl_q.codes)
+                last_line = 'tbl_ref'
                 continue
             # ensure that there is a current question to avoid none type error
             # checking for question code
-            elif (self.cur_q and self.is_flag(line=line, regex=True, flag=self.flags['code'])):
-                # remove code flag from row text
+            elif (cur_q and self.is_flag(line=line, regex=True, flag=self.flags['code'])):
+                # remove code flag from line
                 line = self.remove_flag(
                     line=line, flag=self.flags['code'], regex=True)
                 # update codes of question
-                self.cur_q.codes = line
+                cur_q.codes = line
+                last_line = 'code'
+                continue
+            else: 
+                last_line = None
         # [print(q) for q in self.questions.values()]
 
     def is_flag(self, flag, line, regex=False):
         # if regex is true, use regex library to look for pattern in line
         if regex:
             return re.search(flag, line)
-        # if regex is false check if row text contains flag
+        # if regex is false check if line contains flag
         return flag in line
 
     # get number from string
@@ -251,23 +273,6 @@ class Parser:
             return re.sub(flag, '', line).strip()
         # if regex is false replace flag with white space and then remove white space
         return line.replace(flag, '').strip()
-
-    def check_for_section(self, line_num):
-        # get previous row
-        prev_line = self.content[line_num-1]
-        # get row before previous row
-        sec_prev_line = self.content[line_num-2]
-        # check if second previous row is section header
-        if (self.is_sec_header(sec_prev_line)):
-            # set current section header to second prev row
-            self.cur_sec_header = sec_prev_line
-            # set the section description to prev row
-            # by default the section description is after the header
-            self.cur_sec_desc = prev_line
-        # check if previous row is section header
-        elif (self.is_sec_header(prev_line)):
-            self.cur_sec_header = prev_line
-            self.cur_sec_desc = None
 
     def is_sec_header(self, line):
         # section headers are in all caps
