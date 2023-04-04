@@ -15,7 +15,7 @@ from CWConverter import CWConverter
 
 # TODO REMOVE unused table rows
 # TODO: important test with word apostrophes and other word symbols
-# TODO make ui prompt
+# TODO: important make ui prompt
 # TODO update note property of question
 # TODO add callweb code for comment boxes underneath please specify ()
 # TODO: possibly add skips and conditions
@@ -36,13 +36,13 @@ from CWConverter import CWConverter
 # TODO: read in dk and other responses from new template
 # TODO: test links in regular text
 # TODO: make templates for repeating surveys
-# TODO: important handle error where user doesn't pass in word doc
-# TODO: important handle error where user currently in scw or tables
+# TODO: important handle error when user doesn't pass in word doc
+# TODO: important handle error when user currently in scw or tables
 
 
 class Parser:
     def __init__(self):
-        self.link = "./surveys/survey.docx"
+        self.link = "./surveys/23-985 Saanich 2022 Citizen Satisfaction Survey DRAFT.docx"
         self.content = None
         self.questions = {}
         self.tbl_qs = {}

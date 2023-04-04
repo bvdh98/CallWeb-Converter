@@ -25,7 +25,7 @@ class CWConverter:
 
     def create_tbl_doc(self):
         with open('table_groups.txt', 'w+') as t:
-            t.write('##\tTables\n')
+            t.write('##\tPlace this code underneath the Table section in the SCW\n')
 
     def append_tbl_group(self, qs, q_num):
         # get first table question
@@ -52,7 +52,12 @@ class CWConverter:
 
     def write_callweb_code(self):
         # iterate through each question in survey and convert into callweb code
-        with open('survey.scw', 'w+') as f:
+        with open('survey.txt', 'w+') as f:
+            f.write(
+                '##\tPlace this code underneath the Survey Proper section in the SCW\n')
+            f.write(
+                '##\tYou will have to program any skips, display conditions, and the intro and closing questions yourself'\
+                'as well as custom MIN and MAX variable for any question\n')
             for q in self.survey.values():
                 # TODO: check for when to set MIN or MAX to different val eg: Multi selects
                 f.write(f'Q{q._num} MIN=1 MAX=1\n')
@@ -99,5 +104,5 @@ class CWConverter:
         print(
             'The survey was successfully converted to CallWeb code. '\
             'Please look over the code in survey.scw and table_groups.txt'\
-            'Note: the code in survey.scw may not be correct if you did not follow the template.'\
+            'Note: the code produced may not be correct if you did not follow the template.'\
             'Please refer to the README for more information.')
