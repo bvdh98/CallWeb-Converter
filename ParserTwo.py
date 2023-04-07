@@ -4,6 +4,7 @@ from docx import Document
 import pandas as pd
 import numpy as np
 from CWConverter import CWConverter
+import unicodedata
 # from bs4 import BeautifulSoup
 
 # REQUIREMENTS:
@@ -66,7 +67,7 @@ class Parser:
                       }
         self.main()
 
-    def print_word_tbls(self):
+    def word_tbls_to_xlsx(self):
         writer = pd.ExcelWriter('word_tables.xlsx', engine='xlsxwriter')
         for k, t in self.word_tables.items():
             t.to_excel(writer, sheet_name=f'table-{k}', index=False)
@@ -77,6 +78,7 @@ class Parser:
         # convert document to list with clean data
         self.content = self.get_clean_data(document.text)
         self.create_word_tables()
+        # self.word_tbls_to_xlsx()
         self.create_table_questions()
         self.add_tbl_qs_ref_to_content()
         # df = pd.DataFrame(self.content, columns=['text'])
@@ -90,7 +92,8 @@ class Parser:
         doc = Document(self.link)
         for i, table in enumerate(doc.tables):
             # store cells of table as 2d list
-            cells = [[cell.text for cell in row.cells] for row in table.rows]
+            cells = [[self.clean_str(cell.text)
+                      for cell in row.cells] for row in table.rows]
             word_tble = pd.DataFrame(cells)
             # rename columns with table question first row: strongly agree, 4, ....
             word_tble = word_tble.rename(columns=word_tble.iloc[0]).drop(
@@ -98,10 +101,24 @@ class Parser:
             # append table to list
             self.word_tables[i] = word_tble
 
+    def clean_str(self, str):
+        #convert all unicode character to ASCII then convert to string
+        str = unicodedata.normalize('NFKD', str).encode(
+            'ascii', 'ignore').decode('utf-8')
+        #replace mutiple spaces with single space
+        str = [re.sub('\s+', ' ', str) for str in str]
+        #convert back to string
+        return ''.join(str)
+
     def create_table_questions(self):
+        # TODO: important catch actual error eg: except RAISEVALUEERROR:
+        # TODO: important clean tables like how content was cleaned (unicodes, extra spaces and tabs)
         # TODO replace double loop
         # for each table create a table question and add to tbl qs dictioanry
         for tbl in self.word_tables.values():
+            # if table is empty skip to next one
+            if tbl.empty:
+                continue
             headers = list(tbl.columns)
             headers = self.clean_headers(headers)
             # headers may be empty if table isn't structured properly
@@ -141,23 +158,11 @@ class Parser:
         # remove blank column if it exsists
         if '' in headers:
             headers.remove('')
-        # remove newline character in header
-        self.remove_newline_from_headers(headers)
         return headers
 
     # TODO remove extra spaces in DK/ NA/NR
     # TODO add <br> to text eg: Strongly<br />Disagree <br> 1
     # TODO fix: Very Satisfied5
-
-    def remove_newline_from_headers(self, headers):
-        for header in headers:
-            # get index of header
-            indx = headers.index(header)
-            # remove newline character
-            header = header.replace('\n', '')
-            # update header in list
-            headers[indx] = header
-    # for each table question add a reference to it in the content
 
     def add_tbl_qs_ref_to_content(self):
         # iterate over each table question in dictionary
@@ -176,20 +181,18 @@ class Parser:
                 self.content[ref_indx] = f'tbl_q:{q}'
 
     def get_clean_data(self, data):
-        # characters to replace with CallWeb recognized equivalents
-        chars_to_replace = {'“': '\"', '”': '\"',
-                            '’': '\'', '–': '-', '…': '...', 'é': 'e', '\t': ''}
-        # replace each character in dictionary above
-        for k, v in chars_to_replace.items():
-            data = [str.replace(k, v) for str in data]
-        # convert back to string and then split the lines into a list
-        data = ''.join(data).split('\n')
-        # remove spaces from each line if its not an empty string
-        data = [str.strip() for str in data if str != '']
+        # convert all unicode characters to ASCII then convert to string
+        data = unicodedata.normalize('NFKD', data).encode(
+            'ascii', 'ignore').decode('utf-8')
+        # split the lines into a list
+        data = data.split('\n')
+        # remove trailing and leading spaces from each line if its not a tab, empty string or whitespace
+        data = [str.strip() for str in data if str !=
+                '\t' and not re.search('^[ ]{0,}$', str)]
         return data
 
     def parse(self):
-        #keep track of last line iterated over
+        # keep track of last line iterated over
         last_line = None
         # keep track of current question and current section header and description iterated over
         cur_sec_header = None
@@ -197,13 +200,13 @@ class Parser:
         cur_q = None
         # iterate over each line
         for line in self.content:
-            #check if line is section header
-            if(line.isupper()):
-                #update section header
+            # check if line is section header
+            if (line.isupper()):
+                # update section header
                 cur_sec_header = line
-                #update last line flag
+                # update last line flag
                 last_line = 'sec_header'
-                #skip to next line
+                # skip to next line
                 continue
             # check if line is question text, eg: 1) the......
             elif (self.is_q_text(line)):
@@ -218,13 +221,13 @@ class Parser:
                     num=q_num, sec_header=cur_sec_header, sec_desc=cur_sec_desc, q_text=line, codes={}, tbl_qs=[])
                 # set the current question to this question
                 cur_q = self.questions[q_num]
-                #reset the section description for next question
+                # reset the section description for next question
                 cur_sec_desc = None
                 last_line = 'q_text'
                 # skip to the next line
                 continue
-            #if the last line is a section header and this current line is not question text, update section header to this line
-            elif(last_line == 'sec_header'):
+            # if the last line is a section header and this current line is not question text, update section header to this line
+            elif (last_line == 'sec_header'):
                 cur_sec_desc = line
                 last_line = 'sec_desc'
                 continue
@@ -252,7 +255,7 @@ class Parser:
                 cur_q.codes = line
                 last_line = 'code'
                 continue
-            else: 
+            else:
                 last_line = None
         # [print(q) for q in self.questions.values()]
 
