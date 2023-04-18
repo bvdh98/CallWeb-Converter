@@ -43,10 +43,13 @@ import unicodedata
 
 class Parser:
     def __init__(self):
-        self.link = "./surveys/23-985 Saanich 2022 Citizen Satisfaction Survey DRAFT.docx"
+        self.link = "./surveys"
         self.content = None
         self.questions = {}
         self.tbl_qs = {}
+        self.cur_q = None
+        self.cur_sec_desc = None
+        self.cur_sec_header = None
         # TODO: important change to pandas df
         self.word_tables = {}
         self.flags = {'q_num': r'^[Q][0-9][.]|^[Q][1-9][0-9][.]',
@@ -192,24 +195,12 @@ class Parser:
         return data
 
     def parse(self):
-        # keep track of last line iterated over
-        last_line = None
-        # keep track of current question and current section header and description iterated over
-        cur_sec_header = None
-        cur_sec_desc = None
-        cur_q = None
-        # iterate over each line
-        for line in self.content:
-            # check if line is section header
-            if (line.isupper()):
-                # update section header
-                cur_sec_header = line
-                # update last line flag
-                last_line = 'sec_header'
-                # skip to next line
-                continue
-            # check if line is question text, eg: 1) the......
-            elif (self.is_q_text(line)):
+        # iterate over each row in data frame
+        for line_num, line in enumerate(self.content):
+            # check if row is question text, eg: 1) the......
+            if (self.is_q_text(line)):
+                # check if previous rows are related to the survey section
+                self.check_for_section(line_num)
                 # get number from start of question
                 q_num = self.get_num(line)
                 # remove number from start of question
@@ -218,45 +209,31 @@ class Parser:
                     line=line, flag=self.flags['q_num'], regex=True)
                 # create new question and add it to questions dictionary
                 self.questions[q_num] = Question(
-                    num=q_num, sec_header=cur_sec_header, sec_desc=cur_sec_desc, q_text=line, codes={}, tbl_qs=[])
+                    num=q_num, sec_header=self.cur_sec_header, sec_desc=self.cur_sec_desc, q_text=line, codes={}, tbl_qs=[])
                 # set the current question to this question
-                cur_q = self.questions[q_num]
-                # reset the section description for next question
-                cur_sec_desc = None
-                last_line = 'q_text'
-                # skip to the next line
-                continue
-            # if the last line is a section header and this current line is not question text, update section header to this line
-            elif (last_line == 'sec_header'):
-                cur_sec_desc = line
-                last_line = 'sec_desc'
-                continue
+                self.cur_q = self.questions[q_num]
             # ensure that there is a current question to avoid none type error
             # checking for reference to table question
-            elif (cur_q and self.is_flag(self.flags['tbl_ref'], line)):
+            elif (self.cur_q and self.is_flag(self.flags['tbl_ref'], line)):
                 # extract table id from table reference and strip trailing and starting white space
                 # table refrences are in the form: 'tbl_ref: Q1. question description/table id'
                 tbl_id = line.replace(self.flags['tbl_ref'], '').strip()
                 # get table questions
                 tbl_q = self.tbl_qs[tbl_id]
                 # add table question to current questions list of tbl qs
-                cur_q.tbl_qs = tbl_q
+                self.cur_q.tbl_qs = tbl_q
                 # update current question codes with table q codes
-                cur_q.update_codes_from_tbl_q(tbl_q.codes)
-                last_line = 'tbl_ref'
+                self.cur_q.update_codes_from_tbl_q(tbl_q.codes)
+                # skip to the next row since we just updated the codes
                 continue
             # ensure that there is a current question to avoid none type error
             # checking for question code
-            elif (cur_q and self.is_flag(line=line, regex=True, flag=self.flags['code'])):
-                # remove code flag from line
+            elif (self.cur_q and self.is_flag(line=line, regex=True, flag=self.flags['code'])):
+                # remove code flag from row text
                 line = self.remove_flag(
                     line=line, flag=self.flags['code'], regex=True)
                 # update codes of question
-                cur_q.codes = line
-                last_line = 'code'
-                continue
-            else:
-                last_line = None
+                self.cur_q.codes = line
         # [print(q) for q in self.questions.values()]
 
     def is_flag(self, flag, line, regex=False):
@@ -269,6 +246,23 @@ class Parser:
     # get number from string
     def get_num(self, line):
         return int(re.findall(r'\d+', line)[0])
+
+    def check_for_section(self, line_num):
+        # get previous row
+        prev_line = self.content[line_num-1]
+        # get row before previous row
+        sec_prev_line = self.content[line_num-2]
+        # check if second previous row is section header
+        if (self.is_sec_header(sec_prev_line)):
+            # set current section header to second prev row
+            self.cur_sec_header = sec_prev_line
+            # set the section description to prev row
+            # by default the section description is after the header
+            self.cur_sec_desc = prev_line
+        # check if previous row is section header
+        elif (self.is_sec_header(prev_line)):
+            self.cur_sec_header = prev_line
+            self.cur_sec_desc = None
 
     def remove_flag(self, line, flag, regex=False):
         # if regex is true, use regex library to remove flag from text
