@@ -298,7 +298,11 @@ class Question:
     # print out object in nicer format
     def __str__(self):
         return str(self.__class__) + '\n' + '\n'.join(('{} = {}'.format(item, self.__dict__[item]) for item in self.__dict__))
-
+    
+    @ property
+    def has_oe_opt(self):
+        return self._has_oe_opt
+    
     @ property
     def sec_header(self):
         return self._sec_header
@@ -385,6 +389,30 @@ class TableQuestion(Question):
         self._letter = letter
         Question.__init__(self, num, sec_header, sec_desc,
                           q_text, codes, q_note, tbl_qs)
+
+    @property
+    def headers(self):
+        return self._headers
+    
+    @headers.setter
+    def headers(self,val):
+        self._headers = val
+
+    @property
+    def scale(self):
+        return self._scale
+    
+    @scale.setter
+    def scale(self,val):
+        self._scale = val
+
+    @property
+    def letter(self):
+        return self._letter
+    
+    @letter.setter
+    def letter(self,val):
+        self._letter = val 
 
     @property
     def codes(self):

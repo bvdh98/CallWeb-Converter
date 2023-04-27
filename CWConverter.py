@@ -20,7 +20,7 @@ class CWConverter:
     def write_tbl_qs(self, qs, f):
         # for each table question write out callweb suffix code, eg: "[SUFFIX:_A] question description"
         for q in qs:
-            f.write(f'\t[SUFFIX:_{q._letter}]{q.q_text}\n')
+            f.write(f'\t[SUFFIX:_{q.letter}]{q.q_text}\n')
     # create text file to store call web code for table groups
 
     def create_tbl_doc(self):
@@ -29,9 +29,9 @@ class CWConverter:
 
     def append_tbl_group(self, qs, q_num):
         # get first table question
-        first_tbl_q = qs[0]._letter
+        first_tbl_q = qs[0].letter
         # get last table question
-        last_tbl_q = qs[-1]._letter
+        last_tbl_q = qs[-1].letter
         # append to text document the associated callweb code
         with open('table_groups.txt', 'a') as t:
             t.write(
@@ -56,34 +56,34 @@ class CWConverter:
             f.write(
                 '##\tPlace this code underneath the Survey Proper section in the SCW\n')
             f.write(
-                '##\tYou will have to program any skips, display conditions, and the intro and closing questions yourself'\
+                '##\tYou will have to program any skips, display conditions, and the intro and closing questions yourself'
                 'as well as custom MIN and MAX variable for any question\n')
             for q in self.survey.values():
                 # TODO: check for when to set MIN or MAX to different val eg: Multi selects
-                f.write(f'Q{q._num} MIN=1 MAX=1\n')
+                f.write(f'Q{q.num} MIN=1 MAX=1\n')
                 f.write('% Question\n')
                 # if question has section header write out callweb code for section header
-                if (q._sec_header):
-                    f.write(f'\t<H2>{q._sec_header}</H2>\n')
+                if q.sec_header:
+                    f.write(f'\t<H2>{q.sec_header}</H2>\n')
                 # if question has section description write out associated callweb code
-                if q._sec_desc:
-                    f.write(f'\t<P><strong>{q._sec_desc}</strong></P>\n')
+                if q.sec_desc:
+                    f.write(f'\t<P><strong>{q.sec_desc}</strong></P>\n')
                 # write out question text
-                f.write(f'\t<P><strong>{q._q_text}</strong></P>\n')
+                f.write(f'\t<P><strong>{q.q_text}</strong></P>\n')
                 f.write('% Note\n')
                 # if question has table questions write out associated callweb code
-                if q._tbl_qs:
-                    self.write_tbl_qs(q._tbl_qs, f)
+                if q.tbl_qs:
+                    self.write_tbl_qs(q.tbl_qs, f)
                     # append table group to table_groups.txt
-                    self.append_tbl_group(q._tbl_qs, q._num)
+                    self.append_tbl_group(q.tbl_qs, q.num)
                 # write question codes if applicable
                 f.write('% Codes\n')
-                if q._codes:
-                    self.write_codes(q._codes, f)
+                if q.codes:
+                    self.write_codes(q.codes, f)
                 f.write(f'% Skips\n')
                 f.write(f'% Condition\n')
                 # if question has open-ended option write callweb code for comment box
-                if q._has_oe_opt:
+                if q.has_oe_opt:
                     f.write(f'% Open end\n')
                     f.write('\t66 = C250 5 50\n')
                 else:
@@ -92,9 +92,9 @@ class CWConverter:
 
     def main(self):
         # if no questions were parsed, let the user know
-        if (len(self.survey) == 0):
+        if len(self.survey) == 0:
             print(
-                'Could not convert any questions in the survey to CallWeb.'\
+                'Could not convert any questions in the survey to CallWeb.'
                 'Please refer to the README on how to structure your survey\n')
             return
         # create table section
@@ -102,7 +102,7 @@ class CWConverter:
         self.print_skipped_qs()
         self.write_callweb_code()
         print(
-            'The survey was successfully converted to CallWeb code. '\
-            'Please look over the code in survey.scw and table_groups.txt. '\
-            'Note: the code produced may not be correct if you did not follow the template.'\
+            'The survey was successfully converted to CallWeb code. '
+            'Please look over the code in survey.scw and table_groups.txt. '
+            'Note: the code produced may not be correct if you did not follow the template.'
             'Please refer to the README for more information.')
