@@ -32,18 +32,15 @@ import unicodedata
 # TODO: important test print missing data with oop
 # TODO: important test with surveys in diff format (qtext ,but not section headers, and description)
 # TODO: add logging
-# TODO: add codes to docx template
-# TODO: make table question child of question class
 # TODO: read in dk and other responses from new template
 # TODO: test links in regular text
 # TODO: make templates for repeating surveys
 # TODO: important handle error when user doesn't pass in word doc
-# TODO: important handle error when user currently in scw or tables
 
 
 class Parser:
     def __init__(self):
-        self.link = "./surveys"
+        self.link = "./surveys/23-985 Saanich 2022 Citizen Satisfaction Survey DRAFT.docx"
         self.content = None
         self.questions = {}
         self.tbl_qs = {}
@@ -80,12 +77,13 @@ class Parser:
         document = docx2python(self.link)
         # convert document to list with clean data
         self.content = self.get_clean_data(document.text)
+        # self.navigate_html()
         self.create_word_tables()
         # self.word_tbls_to_xlsx()
         self.create_table_questions()
         self.add_tbl_qs_ref_to_content()
-        # df = pd.DataFrame(self.content, columns=['text'])
-        # df.to_csv('res.csv')
+        df = pd.DataFrame(self.content, columns=['text'])
+        df.to_csv('res.csv')
         self.parse()
         # convert questions to callweb scw
         CWConverter(self.questions)
@@ -105,12 +103,12 @@ class Parser:
             self.word_tables[i] = word_tble
 
     def clean_str(self, str):
-        #convert all unicode character to ASCII then convert to string
+        # convert all unicode character to ASCII then convert to string
         str = unicodedata.normalize('NFKD', str).encode(
             'ascii', 'ignore').decode('utf-8')
-        #replace mutiple spaces with single space
+        # replace multiple spaces with single space
         str = [re.sub('\s+', ' ', str) for str in str]
-        #convert back to string
+        # convert back to string
         return ''.join(str)
 
     def create_table_questions(self):
@@ -158,7 +156,7 @@ class Parser:
     def clean_headers(self, headers):
         # remove duplicates from headers
         headers = list(dict.fromkeys(headers))
-        # remove blank column if it exsists
+        # remove blank column if it exists
         if '' in headers:
             headers.remove('')
         return headers
@@ -392,9 +390,13 @@ class TableQuestion(Question):
     def codes(self):
         # check to make sure headers and scale are same length to avoid index out of bounds error
         if (len(self._headers) != len(self._scale)):
-            return None
+            print(
+                f"The table with the question \"{self.q_text}\" does not have properly formatted headers."
+                "Make sure that there are no duplicate or missing values."
+                "Please refer to the README on how to structure table questions.\n")
+            return {}
         else:
-            # return codes as a dictionary of scale followed by header eg: 5: Very satisfied
+            # return codes as a dictionary of scale numbers followed by header eg: 5: Very satisfied
             return {self._scale[i]: self._headers[i]
                     for i in range(len(self._scale))}
 
