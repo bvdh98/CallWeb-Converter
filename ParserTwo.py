@@ -36,11 +36,9 @@ import unicodedata
 # TODO: test links in regular text
 # TODO: make templates for repeating surveys
 # TODO: important handle error when user doesn't pass in word doc
-
-
 class Parser:
     def __init__(self):
-        self.link = "./surveys/23-985 Saanich 2022 Citizen Satisfaction Survey DRAFT.docx"
+        self.link = "./surveys/test.docx"
         self.content = None
         self.questions = {}
         self.tbl_qs = {}
@@ -196,7 +194,7 @@ class Parser:
         # iterate over each row in data frame
         for line_num, line in enumerate(self.content):
             # check if row is question text, eg: 1) the......
-            if (self.is_q_text(line)):
+            if self.is_q_text(line):
                 # check if previous rows are related to the survey section
                 self.check_for_section(line_num)
                 # get number from start of question
@@ -212,7 +210,7 @@ class Parser:
                 self.cur_q = self.questions[q_num]
             # ensure that there is a current question to avoid none type error
             # checking for reference to table question
-            elif (self.cur_q and self.is_flag(self.flags['tbl_ref'], line)):
+            elif self.cur_q and self.is_flag(self.flags['tbl_ref'], line):
                 # extract table id from table reference and strip trailing and starting white space
                 # table refrences are in the form: 'tbl_ref: Q1. question description/table id'
                 tbl_id = line.replace(self.flags['tbl_ref'], '').strip()
@@ -226,7 +224,7 @@ class Parser:
                 continue
             # ensure that there is a current question to avoid none type error
             # checking for question code
-            elif (self.cur_q and self.is_flag(line=line, regex=True, flag=self.flags['code'])):
+            elif self.cur_q and self.is_flag(line=line, regex=True, flag=self.flags['code']):
                 # remove code flag from row text
                 line = self.remove_flag(
                     line=line, flag=self.flags['code'], regex=True)
@@ -246,19 +244,19 @@ class Parser:
         return int(re.findall(r'\d+', line)[0])
 
     def check_for_section(self, line_num):
-        # get previous row
-        prev_line = self.content[line_num-1]
-        # get row before previous row
-        sec_prev_line = self.content[line_num-2]
-        # check if second previous row is section header
-        if (self.is_sec_header(sec_prev_line)):
+        # get previous row if line number is at least 1 to avoid index out of bounds error
+        prev_line = self.content[line_num-1] if line_num >= 1 else None
+        # get row before previous row if line number is at least 2 to avoid index out of bounds error
+        sec_prev_line = self.content[line_num-2] if line_num >= 2 else None
+        # check if second previous row is section header and not None
+        if sec_prev_line and self.is_sec_header(sec_prev_line):
             # set current section header to second prev row
             self.cur_sec_header = sec_prev_line
             # set the section description to prev row
             # by default the section description is after the header
             self.cur_sec_desc = prev_line
-        # check if previous row is section header
-        elif (self.is_sec_header(prev_line)):
+        # check if previous row is section header and not none
+        elif prev_line and self.is_sec_header(prev_line):
             self.cur_sec_header = prev_line
             self.cur_sec_desc = None
 
@@ -277,8 +275,6 @@ class Parser:
     def is_q_text(self, line):
         # true if paragraph starts with number immediately followed by ')'
         return self.is_flag(flag=self.flags['q_num'], line=line, regex=True)
-
-
 class Question:
     def __init__(self, num=None, sec_header=None, sec_desc=None, q_text=None, codes={}, q_note=None, tbl_qs=[]):
         self._num = num
@@ -298,11 +294,11 @@ class Question:
     # print out object in nicer format
     def __str__(self):
         return str(self.__class__) + '\n' + '\n'.join(('{} = {}'.format(item, self.__dict__[item]) for item in self.__dict__))
-    
+
     @ property
     def has_oe_opt(self):
         return self._has_oe_opt
-    
+
     @ property
     def sec_header(self):
         return self._sec_header
@@ -381,7 +377,6 @@ class Question:
                 return True
         return False
 
-
 class TableQuestion(Question):
     def __init__(self, num=None, letter=None, sec_header=None, sec_desc=None, q_text=None, codes={}, q_note=None, tbl_qs=[], headers=[], scale=[]):
         self._headers = headers
@@ -393,26 +388,26 @@ class TableQuestion(Question):
     @property
     def headers(self):
         return self._headers
-    
+
     @headers.setter
-    def headers(self,val):
+    def headers(self, val):
         self._headers = val
 
     @property
     def scale(self):
         return self._scale
-    
+
     @scale.setter
-    def scale(self,val):
+    def scale(self, val):
         self._scale = val
 
     @property
     def letter(self):
         return self._letter
-    
+
     @letter.setter
-    def letter(self,val):
-        self._letter = val 
+    def letter(self, val):
+        self._letter = val
 
     @property
     def codes(self):

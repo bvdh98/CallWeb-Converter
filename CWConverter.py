@@ -13,8 +13,6 @@ class CWConverter:
         self._survey = val
     # TODO: make generic function for write_tbl_qs and write_codes
     # TODO: important handle cases where prop == None (section header, description, codes)
-    # TODO: replace with properties, eg: q.letter instead of q._letter
-    # TODO: important tell user where to place code in full scw
     # TODO: add qcomp question to end
 
     def write_tbl_qs(self, qs, f):
