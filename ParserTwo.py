@@ -113,7 +113,7 @@ class Parser:
         # TODO: important catch actual error eg: except RAISEVALUEERROR:
         # TODO: important clean tables like how content was cleaned (unicodes, extra spaces and tabs)
         # TODO replace double loop
-        # for each table create a table question and add to tbl qs dictioanry
+        # for each table create a table question and add to tbl qs dictionary
         for tbl in self.word_tables.values():
             # if table is empty skip to next one
             if tbl.empty:
@@ -193,8 +193,9 @@ class Parser:
     def parse(self):
         # iterate over each row in data frame
         for line_num, line in enumerate(self.content):
+            # TODO: possibly add conditions (question is immediately after q flag or after sec header or after sec desc)
             # check if row is question text, eg: 1) the......
-            if self.is_q_text(line):
+            if self.is_flag(flag=self.flags['q_num'], line=line, regex=True):
                 # check if previous rows are related to the survey section
                 self.check_for_section(line_num)
                 # get number from start of question
@@ -248,15 +249,15 @@ class Parser:
         prev_line = self.content[line_num-1] if line_num >= 1 else None
         # get row before previous row if line number is at least 2 to avoid index out of bounds error
         sec_prev_line = self.content[line_num-2] if line_num >= 2 else None
-        # check if second previous row is section header and not None
-        if sec_prev_line and self.is_sec_header(sec_prev_line):
+        # check if second previous row is section header (all caps) and not None
+        if sec_prev_line and sec_prev_line.isupper():
             # set current section header to second prev row
             self.cur_sec_header = sec_prev_line
             # set the section description to prev row
             # by default the section description is after the header
             self.cur_sec_desc = prev_line
-        # check if previous row is section header and not none
-        elif prev_line and self.is_sec_header(prev_line):
+        # check if previous row is section header (all caps) and not none
+        elif prev_line and prev_line.isupper():
             self.cur_sec_header = prev_line
             self.cur_sec_desc = None
 
@@ -267,14 +268,6 @@ class Parser:
         # if regex is false replace flag with white space and then remove white space
         return line.replace(flag, '').strip()
 
-    def is_sec_header(self, line):
-        # section headers are in all caps
-        return line.isupper()
-
-    # TODO: possibly add conditions (question is immediately after q flag or after sec header or after sec desc)
-    def is_q_text(self, line):
-        # true if paragraph starts with number immediately followed by ')'
-        return self.is_flag(flag=self.flags['q_num'], line=line, regex=True)
 class Question:
     def __init__(self, num=None, sec_header=None, sec_desc=None, q_text=None, codes={}, q_note=None, tbl_qs=[]):
         self._num = num
