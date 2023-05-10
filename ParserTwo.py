@@ -5,7 +5,7 @@ import pandas as pd
 import numpy as np
 from CWConverter import CWConverter
 import unicodedata
-# from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup
 
 # REQUIREMENTS:
 # dont format regular questions as tables like in saanich citz survey
@@ -36,12 +36,17 @@ import unicodedata
 # TODO: test links in regular text
 # TODO: make templates for repeating surveys
 # TODO: important handle error when user doesn't pass in word doc
+# TODO: important replace table method with beautiful soup
+# TODO: important test more with front counter bc - alert user about table with all spaces
+
+
 class Parser:
     def __init__(self):
-        self.link = "./surveys/test.docx"
+        self.link = "./surveys/survey.docx"
         self.content = None
         self.questions = {}
         self.tbl_qs = {}
+        # move cur vars to parse function
         self.cur_q = None
         self.cur_sec_desc = None
         self.cur_sec_header = None
@@ -63,6 +68,7 @@ class Parser:
                       'survey_end': '#end',
                       'q_ineligible': 'Q-INELIGIBLE'
                       }
+        # self.navigate_html()
         self.main()
 
     def word_tbls_to_xlsx(self):
@@ -75,9 +81,8 @@ class Parser:
         document = docx2python(self.link)
         # convert document to list with clean data
         self.content = self.get_clean_data(document.text)
-        # self.navigate_html()
         self.create_word_tables()
-        # self.word_tbls_to_xlsx()
+        self.word_tbls_to_xlsx()
         self.create_table_questions()
         self.add_tbl_qs_ref_to_content()
         df = pd.DataFrame(self.content, columns=['text'])
@@ -90,6 +95,13 @@ class Parser:
     def create_word_tables(self):
         doc = Document(self.link)
         for i, table in enumerate(doc.tables):
+            # if table is empty notify user and skip to next table
+            if self.is_empty_tbl(table):
+                print(
+                    f"An empty table was found in this document. "
+                    "If you are trying to reformat the tables in this document, please do so in a new blank document."
+                    "Refer to the README on how to structure table questions.\n")
+                continue
             # store cells of table as 2d list
             cells = [[self.clean_str(cell.text)
                       for cell in row.cells] for row in table.rows]
@@ -100,14 +112,21 @@ class Parser:
             # append table to list
             self.word_tables[i] = word_tble
 
+    def is_empty_tbl(self, tbl):
+        for row in tbl.rows:
+            for cell in row.cells:
+                # cell contains characters other than whitespace return false
+                if not re.search('^[ ]{0,}$', cell.text):
+                    return False
+        # no non whitespace characters were found in the table return true
+        return True
+
     def clean_str(self, str):
         # convert all unicode character to ASCII then convert to string
         str = unicodedata.normalize('NFKD', str).encode(
             'ascii', 'ignore').decode('utf-8')
         # replace multiple spaces with single space
-        str = [re.sub('\s+', ' ', str) for str in str]
-        # convert back to string
-        return ''.join(str)
+        return re.sub('\s+', ' ', str)
 
     def create_table_questions(self):
         # TODO: important catch actual error eg: except RAISEVALUEERROR:
@@ -115,13 +134,10 @@ class Parser:
         # TODO replace double loop
         # for each table create a table question and add to tbl qs dictionary
         for tbl in self.word_tables.values():
-            # if table is empty skip to next one
-            if tbl.empty:
-                continue
             headers = list(tbl.columns)
             headers = self.clean_headers(headers)
             # headers may be empty if table isn't structured properly
-            if headers == None:
+            if len(headers) == 0:
                 # notify user about issue and move to next table
                 print(
                     f"Could not read the table with the question \"{tbl.iloc[0, 0]}\"."
@@ -213,7 +229,7 @@ class Parser:
             # checking for reference to table question
             elif self.cur_q and self.is_flag(self.flags['tbl_ref'], line):
                 # extract table id from table reference and strip trailing and starting white space
-                # table refrences are in the form: 'tbl_ref: Q1. question description/table id'
+                # table references are in the form: 'tbl_ref: Q1. question description/table id'
                 tbl_id = line.replace(self.flags['tbl_ref'], '').strip()
                 # get table questions
                 tbl_q = self.tbl_qs[tbl_id]
@@ -268,6 +284,7 @@ class Parser:
         # if regex is false replace flag with white space and then remove white space
         return line.replace(flag, '').strip()
 
+
 class Question:
     def __init__(self, num=None, sec_header=None, sec_desc=None, q_text=None, codes={}, q_note=None, tbl_qs=[]):
         self._num = num
@@ -280,8 +297,8 @@ class Question:
         self._tbl_qs = tbl_qs
         self._has_oe_opt = False
         # TODO: move flags out of Question class
-        self._99_flags = ['don\'t know', 'no response',
-                          'not applicable', 'prefer not to answer']
+        self._99_flags = ['don\'t know', 'dont know', 'no response',
+                          'not applicable', 'prefer not to answer', 'no opinion']
         self._66_flags = ['other', 'please specify']
 
     # print out object in nicer format
@@ -369,6 +386,7 @@ class Question:
             if flag in option.lower():
                 return True
         return False
+
 
 class TableQuestion(Question):
     def __init__(self, num=None, letter=None, sec_header=None, sec_desc=None, q_text=None, codes={}, q_note=None, tbl_qs=[], headers=[], scale=[]):
