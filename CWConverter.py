@@ -1,3 +1,6 @@
+from termcolor import colored
+
+
 class CWConverter:
     def __init__(self, survey):
         self._survey = survey
@@ -23,7 +26,7 @@ class CWConverter:
 
     def create_tbl_doc(self):
         with open('table_groups.txt', 'w+') as t:
-            t.write('##\tPlace this code underneath the Table section in the SCW\n')
+            t.write('##\tPlace this code underneath the table section in the SCW\n')
 
     def append_tbl_group(self, qs, q_num):
         # get first table question
@@ -45,7 +48,7 @@ class CWConverter:
         # get list of survey questions
         keys = list(self.survey.keys())
         # notify user of questions not found in list
-        [print(f'question {q} was skipped over. Please refer to the README to on how to structure your questions\n')
+        [print(colored(f'question {q} was skipped over. Please refer to the README on how to structure your questions.\n', color='yellow'))
          for q in range(keys[0], keys[-1]+1) if q not in keys]
 
     def write_callweb_code(self):
@@ -55,7 +58,7 @@ class CWConverter:
                 '##\tPlace this code underneath the Survey Proper section in the SCW\n')
             f.write(
                 '##\tYou will have to program any skips, display conditions, and the intro and closing questions yourself'
-                'as well as custom MIN and MAX variable for any question\n')
+                'as well as custom MIN and MAX variables for any question\n')
             for q in self.survey.values():
                 # TODO: check for when to set MIN or MAX to different val eg: Multi selects
                 f.write(f'Q{q.num} MIN=1 MAX=1\n')
@@ -91,16 +94,16 @@ class CWConverter:
     def main(self):
         # if no questions were parsed, let the user know
         if len(self.survey) == 0:
-            print(
+            print(colored(
                 'Could not convert any questions in the survey to CallWeb.'
-                'Please refer to the README on how to structure your survey\n')
+                'Please refer to the README on how to structure your survey\n', color='red'))
             return
         # create table section
         self.create_tbl_doc()
         self.print_skipped_qs()
         self.write_callweb_code()
-        print(
+        print(colored(
             'The survey was successfully converted to CallWeb code. '
-            'Please look over the code in survey.scw and table_groups.txt. '
+            'Please look over the code in survey.txt and table_groups.txt. '
             'Note: the code produced may not be correct if you did not follow the template.'
-            'Please refer to the README for more information.')
+            'Please refer to the README for more information.', color='green'))

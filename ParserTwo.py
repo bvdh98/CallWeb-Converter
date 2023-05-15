@@ -7,6 +7,7 @@ from CWConverter import CWConverter
 import unicodedata
 # from bs4 import BeautifulSoup
 import os
+from termcolor import colored
 
 # REQUIREMENTS:
 # dont format regular questions as tables like in saanich citz survey
@@ -31,14 +32,12 @@ import os
 # TODO: handle images
 # TODO: handle q-ineligble section
 # TODO: important test print missing data with oop
-# TODO: important test with surveys in diff format (qtext ,but not section headers, and description)
+# TODO: important test with surveys in diff format (qtext ,but not section col_names, and description)
 # TODO: add logging
-# TODO: read in dk and other responses from new template
 # TODO: test links in regular text
 # TODO: make templates for repeating surveys
 # TODO: important handle error when user doesn't pass in word doc
 # TODO: important replace table method with beautiful soup
-# TODO: important test more with front counter bc - alert user about table with all spaces
 
 
 class Parser:
@@ -80,7 +79,7 @@ class Parser:
             self.link = self.link.strip('"').strip('\'')
             # if not a link to a word doc, notify user
             if os.path.splitext(self.link)[1] != '.docx':
-                print('Only (.docx) word documents are accepted\n')
+                print(colored('Only (.docx) word documents are accepted\n', color='red'))
                 continue
             try:
                 with open(self.link):
@@ -88,10 +87,10 @@ class Parser:
             # if the file does not exist, notify user
             except FileNotFoundError:
                 print(
-                    "the questionnaire could not be found. Please enter the correct path\n")
+                    colored("The questionnaire could not be found. Please enter the correct path\n", color='red'))
             # if the file can't be opened for whatever reason, notify user
             except e as e:
-                print(e)
+                print(colored(e, color='red'))
 
     def word_tbls_to_xlsx(self):
         writer = pd.ExcelWriter('word_tables.xlsx', engine='xlsxwriter')
@@ -120,9 +119,10 @@ class Parser:
             # if table is empty notify user and skip to next table
             if self.is_empty_tbl(table):
                 print(
-                    f"An empty table was found in this document. "
-                    "If you are trying to reformat the tables in this document, please do so in a new blank document."
-                    "Refer to the README on how to structure table questions.\n")
+                    colored(
+                        f"An empty table was found in this document. "
+                        "If you are trying to reformat the tables in this document, please do so in a new blank document."
+                        "Refer to the README on how to structure table questions.\n", color='yellow'))
                 continue
             # store cells of table as 2d list
             cells = [[self.clean_str(cell.text)
@@ -135,12 +135,14 @@ class Parser:
             self.word_tables[i] = word_tble
 
     def is_empty_tbl(self, tbl):
+        # iterate over each row in table
         for row in tbl.rows:
+            # iterate over each cell in row
             for cell in row.cells:
-                # cell contains characters other than whitespace return false
+                # if cell contains characters other than whitespace return false
                 if not re.search('^[ ]{0,}$', cell.text):
                     return False
-        # no non whitespace characters were found in the table return true
+        # if no non whitespace characters were found in the table return true
         return True
 
     def clean_str(self, str):
@@ -156,14 +158,14 @@ class Parser:
         # TODO replace double loop
         # for each table create a table question and add to tbl qs dictionary
         for tbl in self.word_tables.values():
-            headers = list(tbl.columns)
-            headers = self.clean_headers(headers)
-            # headers may be empty if table isn't structured properly
-            if len(headers) == 0:
+            col_names = list(tbl.columns)
+            col_names = self.clean_col_names(col_names)
+            # column names may be empty if table isn't structured properly
+            if len(col_names) == 0:
                 # notify user about issue and move to next table
-                print(
-                    f"Could not read the table with the question \"{tbl.iloc[0, 0]}\"."
-                    "Please refer to the README on how to structure table questions.\n")
+                print(colored(
+                    f"The table with the question \"{tbl.iloc[0, 0]}\" doesn't have column names."
+                    "Please refer to the README on how to structure table questions.\n", color='yellow'))
                 continue
             try:
                 # values of 5 point scale found in first row starting at second column
@@ -171,9 +173,9 @@ class Parser:
                 # scale may be empty if table isn't structured properly
             except:
                 # notify user about issue and move to next table
-                print(
+                print(colored(
                     f"Could not read the table with the question \"{tbl.iloc[0, 0]}\"."
-                    "Please refer to the README on how to structure table questions.\n")
+                    "Please refer to the README on how to structure table questions.\n", color='yellow'))
                 continue
             # remove duplicates from scale
             scale = list(dict.fromkeys(scale))
@@ -186,20 +188,16 @@ class Parser:
                 q_text = q_text.strip()
                 # create table question and add it to dictionary
                 tbl_q = TableQuestion(
-                    q_text=q_text, headers=headers, letter=q_letter, scale=scale)
+                    q_text=q_text, col_names=col_names, letter=q_letter, scale=scale)
                 self.tbl_qs[q_text] = tbl_q
 
-    def clean_headers(self, headers):
-        # remove duplicates from headers
-        headers = list(dict.fromkeys(headers))
+    def clean_col_names(self, col_names):
+        # remove duplicates from column names
+        col_names = list(dict.fromkeys(col_names))
         # remove blank column if it exists
-        if '' in headers:
-            headers.remove('')
-        return headers
-
-    # TODO remove extra spaces in DK/ NA/NR
-    # TODO add <br> to text eg: Strongly<br />Disagree <br> 1
-    # TODO fix: Very Satisfied5
+        if '' in col_names:
+            col_names.remove('')
+        return col_names
 
     def add_tbl_qs_ref_to_content(self):
         # iterate over each table question in dictionary
@@ -210,8 +208,8 @@ class Parser:
                 ref_indx = self.content.index(q)-1
             except Exception:
                 # if table question can't be found, notify the user
-                print(f'Could not convert the table question: \"{q}\" to CallWeb.'
-                      'Please refer to the README on how to structure table questions\n')
+                print(colored(f'Could not convert the table question: \"{q}\" to CallWeb.'
+                      'Please refer to the README on how to structure table questions\n', color="yellow"))
                 continue
             # avoid index out of bounds error
             if ref_indx >= 0:
@@ -410,20 +408,20 @@ class Question:
 
 
 class TableQuestion(Question):
-    def __init__(self, num=None, letter=None, sec_header=None, sec_desc=None, q_text=None, codes={}, q_note=None, tbl_qs=[], headers=[], scale=[]):
-        self._headers = headers
+    def __init__(self, num=None, letter=None, sec_header=None, sec_desc=None, q_text=None, codes={}, q_note=None, tbl_qs=[], col_names=[], scale=[]):
+        self._col_names = col_names
         self._scale = scale
         self._letter = letter
         Question.__init__(self, num, sec_header, sec_desc,
                           q_text, codes, q_note, tbl_qs)
 
     @property
-    def headers(self):
-        return self._headers
+    def col_names(self):
+        return self._col_names
 
-    @headers.setter
-    def headers(self, val):
-        self._headers = val
+    @col_names.setter
+    def col_names(self, val):
+        self._col_names = val
 
     @property
     def scale(self):
@@ -443,16 +441,16 @@ class TableQuestion(Question):
 
     @property
     def codes(self):
-        # check to make sure headers and scale are same length to avoid index out of bounds error
-        if (len(self._headers) != len(self._scale)):
-            print(
-                f"The table with the question \"{self.q_text}\" does not have properly formatted headers."
-                "Make sure that there are no duplicate or missing values."
-                "Please refer to the README on how to structure table questions.\n")
+        # check to make sure column names and scale are same length to avoid index out of bounds error
+        if (len(self._col_names) != len(self._scale)):
+            print(colored(
+                f"The table with the question \"{self.q_text}\" does not have properly formatted column names."
+                "Make sure that there are no duplicate, missing values, or subsections."
+                "Please refer to the README on how to structure table questions.\n", color='yellow'))
             return {}
         else:
             # return codes as a dictionary of scale numbers followed by header eg: 5: Very satisfied
-            return {self._scale[i]: self._headers[i]
+            return {self._scale[i]: self._col_names[i]
                     for i in range(len(self._scale))}
 
 
