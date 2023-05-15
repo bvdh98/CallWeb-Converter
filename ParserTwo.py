@@ -5,7 +5,8 @@ import pandas as pd
 import numpy as np
 from CWConverter import CWConverter
 import unicodedata
-from bs4 import BeautifulSoup
+# from bs4 import BeautifulSoup
+import os
 
 # REQUIREMENTS:
 # dont format regular questions as tables like in saanich citz survey
@@ -42,7 +43,7 @@ from bs4 import BeautifulSoup
 
 class Parser:
     def __init__(self):
-        self.link = "./surveys/survey.docx"
+        self.link = ''
         self.content = None
         self.questions = {}
         self.tbl_qs = {}
@@ -68,8 +69,29 @@ class Parser:
                       'survey_end': '#end',
                       'q_ineligible': 'Q-INELIGIBLE'
                       }
-        # self.navigate_html()
         self.main()
+
+    def get_survey_doc(self):
+        while True:
+            # get link to survey questionnaire word doc
+            self.link = input(
+                "enter the path to the survey questionnaire word document: \n")
+            # remove quotation marks from link
+            self.link = self.link.strip('"').strip('\'')
+            # if not a link to a word doc, notify user
+            if os.path.splitext(self.link)[1] != '.docx':
+                print('Only (.docx) word documents are accepted\n')
+                continue
+            try:
+                with open(self.link):
+                    return docx2python(self.link)
+            # if the file does not exist, notify user
+            except FileNotFoundError:
+                print(
+                    "the questionnaire could not be found. Please enter the correct path\n")
+            # if the file can't be opened for whatever reason, notify user
+            except e as e:
+                print(e)
 
     def word_tbls_to_xlsx(self):
         writer = pd.ExcelWriter('word_tables.xlsx', engine='xlsxwriter')
@@ -78,7 +100,7 @@ class Parser:
         writer.close()
 
     def main(self):
-        document = docx2python(self.link)
+        document = self.get_survey_doc()
         # convert document to list with clean data
         self.content = self.get_clean_data(document.text)
         self.create_word_tables()
@@ -377,7 +399,6 @@ class Question:
 
     @ tbl_qs.setter
     def tbl_qs(self, val):
-        # print(val)
         self._tbl_qs.append(val)
     # TODO move function out of Question class
 
