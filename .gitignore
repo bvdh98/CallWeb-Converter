@@ -15,4 +15,5 @@ docx_xml_processing.py
 Parser.py
 .vscode
 __pycache__
-surveys
+templates
+devtest
