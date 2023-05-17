@@ -9,8 +9,6 @@ import os
 from termcolor import colored
 
 # TODO REMOVE unused table lines
-# TODO: important test with word apostrophes and other word symbols
-# TODO: important make ui prompt
 # TODO update note property of question
 # TODO add callweb code for comment boxes underneath please specify ()
 # TODO: possibly add skips and conditions
@@ -18,32 +16,22 @@ from termcolor import colored
 # TODO: IMPORTANT organize methods into different classes instead of all in Parser class
 # TODO: important notify user of missing questions and properties
 # TODO: important error handling
-# TODO: maybe change table questions into one dataframe instead of dictionary
 # TODO: important print out callweb scw template
 # TODO: handle mutiple table sections eg: q17 in saanich citz survey
 # TODO: handle images
 # TODO: handle q-ineligble section
-# TODO: important test print missing data with oop
-# TODO: important test with surveys in diff format (qtext ,but not section col_names, and description)
 # TODO: add logging
 # TODO: test links in regular text
-# TODO: make templates for repeating surveys
-# TODO: important handle error when user doesn't pass in word doc
 # TODO: important replace table method with beautiful soup
 
 
 class Parser:
     def __init__(self):
         self.link = ''
-        self.test_mode = False
+        self.test_mode = True
         self.content = None
         self.questions = {}
         self.tbl_qs = {}
-        # move cur vars to parse function
-        self.cur_q = None
-        self.cur_sec_desc = None
-        self.cur_sec_header = None
-        # TODO: important change to pandas df
         self.word_tables = {}
         self.flags = {'q_num': r'^[Q][0-9][.]|^[Q][1-9][0-9][.]',
                       'code': r'^[0-9][)]|^[1-9][0-9][)]',
@@ -138,7 +126,9 @@ class Parser:
         str = unicodedata.normalize('NFKD', str).encode(
             'ascii', 'ignore').decode('utf-8')
         # replace multiple spaces with single space
-        return re.sub('\s+', ' ', str)
+        str = re.sub('\s+', ' ', str)
+        # remove trailing and ending white space
+        return str.strip()
 
     def create_table_questions(self):
         # TODO: important catch actual error eg: except RAISEVALUEERROR:
@@ -167,13 +157,10 @@ class Parser:
                 continue
             # remove duplicates from scale
             scale = list(dict.fromkeys(scale))
-            # TODO: replace with pandas vectorization
             # iterate over questions found in first column and create table questions
             for i, q_text in enumerate(tbl.iloc[0:, 0].values):
                 # create letter for question e.g.: A,B,C...
                 q_letter = chr(i+65)
-                # remove trailing and ending white space
-                q_text = q_text.strip()
                 # create table question and add it to dictionary
                 tbl_q = TableQuestion(
                     q_text=q_text, col_names=col_names, letter=q_letter, scale=scale)
@@ -215,6 +202,10 @@ class Parser:
         return data
 
     def parse(self):
+        # keep track of current question, sec description, and section header iterated over
+        self.cur_q = None
+        self.cur_sec_desc = None
+        self.cur_sec_header = None
         # iterate over each row in data frame
         for line_num, line in enumerate(self.content):
             # TODO: possibly add conditions (question is immediately after q flag or after sec header or after sec desc)
@@ -298,14 +289,14 @@ class Question:
         self._sec_header = sec_header
         self._sec_desc = sec_desc
         self._q_text = q_text
-        # TODO: order codes numerically for each question
         self._codes = codes
         self._q_note = q_note
         self._tbl_qs = tbl_qs
         self._has_oe_opt = False
-        # TODO: move flags out of Question class
+        #different 99 codes
         self._99_flags = ['don\'t know', 'dont know', 'no response',
                           'not applicable', 'prefer not to answer', 'no opinion']
+        #different 66 codes
         self._66_flags = ['other', 'please specify']
 
     # print out object in nicer format
@@ -385,7 +376,6 @@ class Question:
     @ tbl_qs.setter
     def tbl_qs(self, val):
         self._tbl_qs.append(val)
-    # TODO move function out of Question class
 
     def is_special_code(self, option, flags):
         for flag in flags:
