@@ -14,9 +14,6 @@ class CWConverter:
     @ survey.setter
     def survey(self, val):
         self._survey = val
-    # TODO: make generic function for write_tbl_qs and write_codes
-    # TODO: important handle cases where prop == None (section header, description, codes)
-    # TODO: add qcomp question to end
 
     def write_tbl_qs(self, qs, f):
         # for each table question write out callweb suffix code, eg: "[SUFFIX:_A] question description"
@@ -60,7 +57,6 @@ class CWConverter:
                 '##\tYou will have to program any skips, display conditions, and the intro and closing questions yourself'
                 'as well as custom MIN and MAX variables for any question\n')
             for q in self.survey.values():
-                # TODO: check for when to set MIN or MAX to different val eg: Multi selects
                 f.write(f'Q{q.num} MIN=1 MAX=1\n')
                 f.write('% Question\n')
                 # if question has section header write out callweb code for section header

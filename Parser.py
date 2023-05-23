@@ -22,13 +22,20 @@ from termcolor import colored
 # TODO: handle q-ineligble section
 # TODO: add logging
 # TODO: test links in regular text
-# TODO: important replace table method with beautiful soup
+# TODO: important replace table method with beautiful soup in create_table_questions func
+# TODO: important catch actual error eg: except RAISEVALUEERROR: in create_table_questions func
+# TODO: important clean tables like how content was cleaned (unicodes, extra spaces and tabs) in create_table_questions func
+# TODO replace double loop in create_table_questions func
+# TODO: make generic function for write_tbl_qs and write_codes in CWConverter.py
+# TODO: important handle cases where prop == None (section header, description, codes) in CWConverter.py
+# TODO: add qcomp question to end in CWConverter.py
+# TODO: possibly add conditions (question is immediately after q flag or after sec header or after sec desc)
 
 
 class Parser:
     def __init__(self):
         self.link = ''
-        self.test_mode = True
+        self.test_mode = False
         self.content = None
         self.questions = {}
         self.tbl_qs = {}
@@ -115,8 +122,8 @@ class Parser:
         for row in tbl.rows:
             # iterate over each cell in row
             for cell in row.cells:
-                # if cell contains characters other than whitespace return false
-                if not re.search('^[ ]{0,}$', cell.text):
+                # if cell contains characters other than white or empty space return false
+                if not (cell.text.isspace() or cell.text == ''):
                     return False
         # if no non whitespace characters were found in the table return true
         return True
@@ -131,9 +138,6 @@ class Parser:
         return str.strip()
 
     def create_table_questions(self):
-        # TODO: important catch actual error eg: except RAISEVALUEERROR:
-        # TODO: important clean tables like how content was cleaned (unicodes, extra spaces and tabs)
-        # TODO replace double loop
         # for each table create a table question and add to tbl qs dictionary
         for tbl in self.word_tables.values():
             col_names = list(tbl.columns)
@@ -183,7 +187,7 @@ class Parser:
                 ref_indx = self.content.index(q)-1
             except Exception:
                 # if table question can't be found, notify the user
-                print(colored(f'Could not convert the table question: \"{q}\" to CallWeb.'
+                print(colored(f'Could not convert the table question: \"{q}\" to CallWeb code.'
                       'Please refer to the README on how to structure table questions\n', color="yellow"))
                 continue
             # avoid index out of bounds error
@@ -196,9 +200,9 @@ class Parser:
             'ascii', 'ignore').decode('utf-8')
         # split the lines into a list
         data = data.split('\n')
-        # remove trailing and leading spaces from each line if its not a tab, empty string or whitespace
-        data = [str.strip() for str in data if str !=
-                '\t' and not re.search('^[ ]{0,}$', str)]
+        # remove trailing and leading spaces from each line if its not a tab, empty string, or empty or whitespace
+        data = [str.strip()
+                for str in data if not (str.isspace() or str == '')]
         return data
 
     def parse(self):
@@ -208,7 +212,6 @@ class Parser:
         self.cur_sec_header = None
         # iterate over each row in data frame
         for line_num, line in enumerate(self.content):
-            # TODO: possibly add conditions (question is immediately after q flag or after sec header or after sec desc)
             # check if row is question text, eg: 1) the......
             if self.is_flag(flag=self.flags['q_num'], line=line, regex=True):
                 # check if previous rows are related to the survey section
@@ -293,10 +296,10 @@ class Question:
         self._q_note = q_note
         self._tbl_qs = tbl_qs
         self._has_oe_opt = False
-        #different 99 codes
+        # different 99 codes
         self._99_flags = ['don\'t know', 'dont know', 'no response',
                           'not applicable', 'prefer not to answer', 'no opinion']
-        #different 66 codes
+        # different 66 codes
         self._66_flags = ['other', 'please specify']
 
     # print out object in nicer format
