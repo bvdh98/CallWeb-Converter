@@ -18,3 +18,5 @@ docx_xml_processing.py
 __pycache__
 templates
 devtest
+#Dont ignore:
+!README.docx
