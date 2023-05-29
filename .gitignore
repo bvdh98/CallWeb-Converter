@@ -2,7 +2,9 @@
 *.docx
 *.scw
 *.xlsx
-*.txt
+survey.txt
+table_groups.txt
+todo.txt
 *R
 *html
 *htm

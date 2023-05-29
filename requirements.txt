@@ -1,0 +1,5 @@
+docx2python==2.0.4
+numpy==1.23.5
+pandas==1.5.2
+python_docx==0.8.11
+termcolor==2.3.0

@@ -8,29 +8,6 @@ import unicodedata
 import os
 from termcolor import colored
 
-# TODO REMOVE unused table lines
-# TODO update note property of question
-# TODO add callweb code for comment boxes underneath please specify ()
-# TODO: possibly add skips and conditions
-# TODO handle intro and closing sections
-# TODO: IMPORTANT organize methods into different classes instead of all in Parser class
-# TODO: important notify user of missing questions and properties
-# TODO: important error handling
-# TODO: important print out callweb scw template
-# TODO: handle mutiple table sections eg: q17 in saanich citz survey
-# TODO: handle images
-# TODO: handle q-ineligble section
-# TODO: add logging
-# TODO: test links in regular text
-# TODO: important replace table method with beautiful soup in create_table_questions func
-# TODO: important catch actual error eg: except RAISEVALUEERROR: in create_table_questions func
-# TODO: important clean tables like how content was cleaned (unicodes, extra spaces and tabs) in create_table_questions func
-# TODO replace double loop in create_table_questions func
-# TODO: make generic function for write_tbl_qs and write_codes in CWConverter.py
-# TODO: important handle cases where prop == None (section header, description, codes) in CWConverter.py
-# TODO: add qcomp question to end in CWConverter.py
-# TODO: possibly add conditions (question is immediately after q flag or after sec header or after sec desc)
-
 
 class Parser:
     def __init__(self):
