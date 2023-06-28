@@ -22,7 +22,7 @@ class CWConverter:
     # create text file to store call web code for table groups
 
     def create_tbl_doc(self):
-        with open('table_groups.txt', 'w+') as t:
+        with open('output/table_groups.txt', 'w+') as t:
             t.write('##\tPlace this code underneath the table section in the SCW\n')
 
     def append_tbl_group(self, qs, q_num):
