@@ -31,7 +31,7 @@ class CWConverter:
         # get last table question
         last_tbl_q = qs[-1].letter
         # append to text document the associated callweb code
-        with open('table_groups.txt', 'a') as t:
+        with open('output/table_groups.txt', 'a') as t:
             t.write(
                 f'\n\t#Group GRP_Q{q_num} = Q{q_num}_{first_tbl_q} - Q{q_num}_{last_tbl_q}\n')
             t.write(
@@ -50,7 +50,7 @@ class CWConverter:
 
     def write_callweb_code(self):
         # iterate through each question in survey and convert into callweb code
-        with open('survey.txt', 'w+') as f:
+        with open('output/survey.txt', 'w+') as f:
             f.write(
                 '##\tPlace this code underneath the Survey Proper section in the SCW\n')
             f.write(
